@@ -6,25 +6,11 @@
       "channel": "dev"
     }
   ],
-  "verifyConditions": [
-    "@semantic-release/changelog",
-    "@semantic-release/exec",
-    "@semantic-release/git",
-    "@semantic-release/github"
-  ],
+  "tagFormat": "v${version}-dev",
   "plugins": [
     "@semantic-release/commit-analyzer",
     "@semantic-release/release-notes-generator",
     "@semantic-release/changelog",
-    [
-      "@semantic-release/npm", 
-      {
-        "npmPublish": false,
-        "tarballDir": "pack",
-        "pkgRoot": ".",
-        "verifyConditions": false
-      }
-    ],
     [
       "@semantic-release/exec", 
       {
@@ -47,6 +33,5 @@
         "releasedLabels": false
       }
     ]
-  ],
-  "tagFormat": "v${version}-dev"
+  ]
 }

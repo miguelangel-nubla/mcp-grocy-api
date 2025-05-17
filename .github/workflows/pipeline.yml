@@ -98,6 +98,17 @@ jobs:
           name: build
           path: build/
       
+      # Verify release configuration before running semantic-release
+      - name: Verify Release Configuration
+        run: |
+          echo "Verifying release configuration..."
+          npm run verify-release-config
+          if [ $? -ne 0 ]; then
+            echo "::error::Release configuration verification failed!"
+            exit 1
+          fi
+          echo "Release configuration verification passed!"
+      
       # Conditionally setup npm token for main branch only
       - name: Setup npm token for main branch
         if: github.ref == 'refs/heads/main'
@@ -127,10 +138,17 @@ jobs:
         if: github.ref == 'refs/heads/dev'
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          # No NPM_TOKEN needed as we've excluded npm plugin from verifyConditions
+          # No NPM token needed for dev branch as npm publishing is disabled
+          NPM_TOKEN: ""
+          NODE_AUTH_TOKEN: ""
           # Enable debug mode for more verbose output
           DEBUG: "semantic-release:*"
-        run: npx semantic-release --debug -e ./.release-dev.json
+        run: |
+          echo "Running semantic-release on dev branch without npm publishing..."
+          # Verify the release dev config first
+          cat .release-dev.json
+          # Run semantic release with the dev config
+          npx semantic-release --debug -e ./.release-dev.json
         continue-on-error: false
       
       # Store the new version number as an output variable
