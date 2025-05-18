@@ -1,3 +1,10 @@
+## [1.3.5](https://github.com/saya6k/mcp-grocy-api/compare/v1.3.4...v1.3.5) (2025-05-18)
+
+
+### Bug Fixes
+
+* update pipeline.yml to fix ESM module handling in validate-release job ([23dc4d3](https://github.com/saya6k/mcp-grocy-api/commit/23dc4d38c0952c1629a504e5a554513f73fc79e6))
+
 ## [1.3.4](https://github.com/saya6k/mcp-grocy-api/compare/v1.3.3...v1.3.4) (2025-05-18)
 
 
