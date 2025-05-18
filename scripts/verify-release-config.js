@@ -68,8 +68,30 @@ async function verifyReleaseConfigs() {
     
     console.log('\n=== Dev Release Configuration ===');
     console.log('Branches:', JSON.stringify(devConfig.branches, null, 2));
+    
+    // Check if CI mode is disabled (critical for dev branch)
+    if (devConfig.ci === false) {
+      console.log('✓ Dev branch has "ci": false (good for avoiding token checks)');
+    } else {
+      console.log('⚠️ Dev branch should set "ci": false to avoid token validation');
+    }
+    
+    // Check top-level npmPublish setting
+    if (devConfig.npmPublish === false) {
+      console.log('✓ Dev config has top-level "npmPublish": false (good)');
+    } else {
+      console.log('⚠️ Consider adding top-level "npmPublish": false for extra safety');
+    }
+    
     if (devConfig.verifyConditions) {
       console.log('Verify Conditions:', JSON.stringify(devConfig.verifyConditions, null, 2));
+      
+      // Check if verifyConditions excludes npm
+      if (!devConfig.verifyConditions.includes('@semantic-release/npm')) {
+        console.log('✓ Dev branch correctly excludes npm from verifyConditions');
+      } else {
+        console.error('❌ Dev branch should NOT include @semantic-release/npm in verifyConditions');
+      }
     }
     
     // Extract and check NPM publishing configuration
@@ -109,6 +131,11 @@ async function verifyReleaseConfigs() {
       console.warn('\n⚠️ Potential configuration issues:');
       duplicatedSections.forEach(msg => console.warn(`- ${msg}`));
     }
+    
+    // Add recommendations about CLI arguments
+    console.log('\n=== CI Command Recommendations ===');
+    console.log('✓ For dev branch, use: npx semantic-release --no-ci --extends ./.release-dev.json');
+    console.log('  This ensures that npm tokens are not validated and config is completely replaced');
     
     console.log('\n✅ Configuration verification complete');
     return true;

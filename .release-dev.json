@@ -7,10 +7,26 @@
     }
   ],
   "tagFormat": "v${version}-dev",
+  "ci": false,
+  "npmPublish": false,
+  "verifyConditions": [
+    "@semantic-release/changelog",
+    "@semantic-release/exec",
+    "@semantic-release/git",
+    "@semantic-release/github"
+  ],
   "plugins": [
     "@semantic-release/commit-analyzer",
     "@semantic-release/release-notes-generator",
     "@semantic-release/changelog",
+    [
+      "@semantic-release/npm", 
+      {
+        "npmPublish": false,
+        "tarballDir": false,
+        "verifyConditions": false
+      }
+    ],
     [
       "@semantic-release/exec", 
       {
@@ -30,7 +46,8 @@
         "failComment": false,
         "failTitle": false,
         "labels": false,
-        "releasedLabels": false
+        "releasedLabels": false,
+        "assets": []
       }
     ]
   ]

@@ -147,8 +147,9 @@ jobs:
           echo "Running semantic-release on dev branch without npm publishing..."
           # Verify the release dev config first
           cat .release-dev.json
-          # Run semantic release with the dev config
-          npx semantic-release --debug -e ./.release-dev.json
+          # Use --no-ci to avoid it looking for npmrc/tokens
+          # Use --extends to completely replace the config rather than extend it
+          npx semantic-release --debug --no-ci --extends ./.release-dev.json
         continue-on-error: false
       
       # Store the new version number as an output variable
