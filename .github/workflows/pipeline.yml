@@ -150,11 +150,34 @@ jobs:
           echo "Verifying release configuration..."
           npm run verify-release-config
           
+          # Fetch all tags and history to ensure accurate version calculation
+          echo "Fetching complete git history and tags for accurate versioning..."
+          git fetch --unshallow --tags
+          
+          # Show current version details
+          echo "Current package version: $(node -p "require('./package.json').version")"
+          echo "Latest git tag: $(git describe --abbrev=0 --tags || echo 'no tags found')"
+          
+          # Run the prepare-dev-release script to set proper version based on main branch
+          echo "Running prepare-dev-release script to ensure correct versioning..."
+          npm run prepare-dev-release
+          
+          # If the version was updated, commit the changes
+          if git diff --name-only | grep -q "package.json\|config.yaml"; then
+            echo "Version was updated, committing changes..."
+            git config --local user.email "github-actions[bot]@users.noreply.github.com"
+            git config --local user.name "github-actions[bot]"
+            git add package.json config.yaml
+            git commit -m "chore(release): update version for dev branch [skip ci]"
+            # Note: We don't push here, semantic-release will handle that
+          else
+            echo "No version changes detected."
+          fi
+          
           # Run semantic-release with the proper flags for dev branch
           # Use --no-ci for environment variable handling
           # Use --extends with explicit path for complete config replacement
           # Use --no-npm to explicitly skip npm-related functionality
-          # Adding NODE_DEBUG to trace semantic-release plugin loading
           NODE_DEBUG=semantic-release:* npx semantic-release --debug --no-ci --no-npm --extends $(pwd)/.release-dev.json || {
             echo "::warning::Semantic release failed but we'll continue the workflow"
             

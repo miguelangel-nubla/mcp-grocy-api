@@ -35,7 +35,8 @@
     "prepare-dev-release:patch": "node scripts/prepare-dev-release.js --patch",
     "prepare-dev-release:minor": "node scripts/prepare-dev-release.js --minor",
     "prepare-dev-release:major": "node scripts/prepare-dev-release.js --major",
-    "prepare-dev-release:dryrun": "node scripts/prepare-dev-release.js --dry-run"
+    "prepare-dev-release:dryrun": "node scripts/prepare-dev-release.js --dry-run",
+    "debug-version-increment": "node scripts/debug-version-increment.js"
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.11.3",
