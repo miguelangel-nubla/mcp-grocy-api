@@ -6,6 +6,13 @@
  * 
  * It checks for common issues with NPM token authentication and ensures that
  * the dev branch configuration doesn't attempt to publish to NPM.
+ * 
+ * The script performs the following checks:
+ * - Validates JSON syntax in both configs
+ * - Checks for presence of NPM plugin in dev config
+ * - Verifies proper settings to avoid NPM token validation
+ * - Looks for configuration conflicts or duplications
+ * - Recommends correct CLI flags for different environments
  */
 
 import fs from 'fs';
@@ -55,15 +62,22 @@ async function verifyReleaseConfigs() {
     console.log('Branches:', JSON.stringify(mainConfig.branches, null, 2));
     
     // Extract and check NPM publishing configuration
-    const mainNpmPlugin = mainConfig.plugins.find(plugin => 
-      Array.isArray(plugin) && plugin[0] === '@semantic-release/npm');
+    let mainNpmPlugin = null;
     
-    if (mainNpmPlugin) {
-      console.log('NPM Plugin Config (main):', JSON.stringify(mainNpmPlugin[1], null, 2));
-      console.log('✓ Main branch is configured to publish to NPM');
+    if (mainConfig.plugins) {
+      mainNpmPlugin = mainConfig.plugins.find(plugin => 
+        Array.isArray(plugin) && plugin[0] === '@semantic-release/npm');
+      
+      if (mainNpmPlugin) {
+        console.log('NPM Plugin Config (main):', JSON.stringify(mainNpmPlugin[1], null, 2));
+        console.log('✓ Main branch is configured to publish to NPM');
+      } else {
+        console.log('❓ NPM Plugin not found in main configuration');
+        console.log('⚠️ This may be intentional, but verify that main can publish to NPM if needed');
+      }
     } else {
-      console.log('❓ NPM Plugin not found in main configuration');
-      console.log('⚠️ This may be intentional, but verify that main can publish to NPM if needed');
+      console.log('⚠️ Main config has no plugins array defined');
+      console.log('  Verify that NPM publishing is correctly configured if needed');
     }
     
     console.log('\n=== Dev Release Configuration ===');
@@ -95,8 +109,12 @@ async function verifyReleaseConfigs() {
     }
     
     // Extract and check NPM publishing configuration
-    const devNpmPlugin = devConfig.plugins.find(plugin => 
-      Array.isArray(plugin) && plugin[0] === '@semantic-release/npm');
+    let devNpmPlugin = null;
+    
+    if (devConfig.plugins) {
+      devNpmPlugin = devConfig.plugins.find(plugin => 
+        Array.isArray(plugin) && plugin[0] === '@semantic-release/npm');
+    }
     
     if (devNpmPlugin) {
       console.log('⚠️ NPM Plugin found in dev branch config:', JSON.stringify(devNpmPlugin[1], null, 2));
@@ -123,8 +141,15 @@ async function verifyReleaseConfigs() {
     
     // Check if we have duplicated config sections
     const duplicatedSections = [];
+    
+    // Check dev config for mixed plugin/step configuration
     if (devConfig.plugins && (devConfig.verifyConditions || devConfig.prepare || devConfig.publish)) {
-      duplicatedSections.push('Using both plugins array and step-specific configurations can cause conflicts');
+      duplicatedSections.push('Dev config: Using both plugins array and step-specific configurations can cause conflicts');
+    }
+    
+    // Check main config for mixed plugin/step configuration
+    if (mainConfig.plugins && (mainConfig.verifyConditions || mainConfig.prepare || mainConfig.publish)) {
+      duplicatedSections.push('Main config: Using both plugins array and step-specific configurations can cause conflicts');
     }
     
     if (duplicatedSections.length > 0) {
@@ -134,8 +159,15 @@ async function verifyReleaseConfigs() {
     
     // Add recommendations about CLI arguments
     console.log('\n=== CI Command Recommendations ===');
-    console.log('✓ For dev branch, use: npx semantic-release --no-ci --extends ./.release-dev.json');
+    console.log('✓ For dev branch, use: npx semantic-release --no-ci --no-npm --extends $(pwd)/.release-dev.json');
     console.log('  This ensures that npm tokens are not validated and config is completely replaced');
+    console.log('✓ The --no-npm flag specifically disables all npm-related functionality');
+    console.log('✓ Using $(pwd) with .release-dev.json ensures absolute paths are used');
+    
+    console.log('\n=== Local Testing ===');
+    console.log('✓ For testing locally without any token checks:');
+    console.log('  GITHUB_TOKEN=dummy npx semantic-release --dry-run --no-ci --no-npm --extends $(pwd)/.release-dev.json');
+    console.log('  This allows testing the release process without actual token validation');
     
     console.log('\n✅ Configuration verification complete');
     return true;

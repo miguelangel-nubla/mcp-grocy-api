@@ -28,7 +28,8 @@
     "check-tools": "node scripts/check-tools.js",
     "validate-release": "node scripts/check-tools.js --validate-release",
     "update-api-docs": "node scripts/fetch-grocy-api.js",
-    "verify-release-config": "node scripts/verify-release-config.js"
+    "verify-release-config": "node scripts/verify-release-config.js",
+    "debug-release-config": "node scripts/debug-release-config.js"
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.11.3",
