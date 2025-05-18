@@ -1,3 +1,10 @@
+## [1.3.7](https://github.com/saya6k/mcp-grocy-api/compare/v1.3.6...v1.3.7) (2025-05-18)
+
+
+### Bug Fixes
+
+* delete validate-release that causes problem ([1b4342f](https://github.com/saya6k/mcp-grocy-api/commit/1b4342f841418f2321b05c8b88e3ca15b75f48d0))
+
 ## [1.3.6](https://github.com/saya6k/mcp-grocy-api/compare/v1.3.5...v1.3.6) (2025-05-18)
 
 
