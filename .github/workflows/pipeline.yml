@@ -235,10 +235,9 @@ jobs:
           npm init -y
           # Update package.json to support ESM
           node -e "const fs = require('fs'); const pkg = require('./package.json'); pkg.type = 'module'; fs.writeFileSync('package.json', JSON.stringify(pkg, null, 2));"
-          # Install the package locally instead of globally
+          # Install the package locally for imports
           npm install mcp-grocy-api@${{ needs.release.outputs.version }}
           # Also install globally for the CLI tests
-          npm install mcp-grocy-api@${{ needs.release.outputs.version }}
           npm install -g mcp-grocy-api@${{ needs.release.outputs.version }}
           
           # Create a basic test script to validate the package
