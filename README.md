@@ -19,42 +19,66 @@ cd mcp-grocy-api
 npm install
 npm audit fix
 npm build
-node ./build/index.js
 ```
 
 ### Docker
 
-You should use [tini](https://github.com/krallin/tini) to init.
 ```bash
-docker pull ghcr.io/saya6k/mcp-grocy-api:latest
-docker run ghcr.io/saya6k/mcp-grocy-api:latest tini -- node build/index.js
+docker run -p 8080:8080 -e GROCY_API_KEY=your_api_key -e GROCY_API_URL=http://your-grocy-instance ghcr.io/saya6k/mcp-grocy-api:latest
 ```
 
-See [installation.md](src/resources/installation.md) for more installation options and configuration instructions.
+### Home Assistant Add-on
 
-## Home Assistant Addon
+The MCP Grocy API is available as a Home Assistant add-on through [saya6k's add-on repository](https://github.com/saya6k/hassio-addons).
 
-For Home Assistant addon specific documentation, see [DOCS.md](DOCS.md).
+## Usage
 
-## API Reference
+To use the API, you need to provide the Grocy API URL and API key:
 
-For a complete list of all available API endpoints and examples, see [API Examples Documentation](./src/resources/examples.md).
+```bash
+# Start the server with environment variables
+GROCY_API_URL=http://your-grocy-instance GROCY_API_KEY=your_api_key npx mcp-grocy-api
+```
+
+Or to start in development mode:
+
+```bash
+# Start the server with sample/mock responses (no real Grocy instance needed)
+npx mcp-grocy-api --mock
+```
+
+### Environment Variables
+
+- `GROCY_API_URL`: Your Grocy API URL
+- `GROCY_API_KEY`: Your Grocy API key
+- `PORT`: Port to run the server on (default: 8080)
+- `LOG_LEVEL`: Log level (default: info)
+
+## Documentation
+
+### API Reference
+
+For the full API reference, see the [API Reference](build/resources/api-reference.md).
+
+### Configuration
+
+For configuration options, see the [Configuration Guide](build/resources/config.md).
 
 ## Development
 
-### Release Process
+### Prerequisites
 
-This project uses semantic-release for automated versioning and publishing. Two branches are configured:
+- Node.js 18 or higher
+- Grocy instance (or use `--mock` for development)
 
-- `main`: Production releases that are published to npm
-- `dev`: Pre-releases for testing, with version tags in the format `v1.2.3-dev.1`
-
-To validate the release configuration:
+### Testing
 
 ```bash
-npm run verify-release-config
+npm test
 ```
 
-This ensures that:
-1. The main branch correctly publishes to npm
-2. The dev branch creates pre-releases without npm publishing (avoiding token authentication errors)
+## License
+
+This project is licensed under the [MIT License](LICENSE).
+
+# Release trigger update Sun May 18 11:47:48 +09 2025
