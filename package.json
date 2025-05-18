@@ -1,6 +1,6 @@
 {
   "name": "mcp-grocy-api",
-  "version": "1.3.2",
+  "version": "1.3.4-dev.1",
   "description": "Model Context Protocol (MCP) wrapper for grocy API",
   "license": "MIT",
   "type": "module",
@@ -29,7 +29,13 @@
     "validate-release": "node scripts/check-tools.js --validate-release",
     "update-api-docs": "node scripts/fetch-grocy-api.js",
     "verify-release-config": "node scripts/verify-release-config.js",
-    "debug-release-config": "node scripts/debug-release-config.js"
+    "debug-release-config": "node scripts/debug-release-config.js",
+    "test-version": "node scripts/test-version.js",
+    "prepare-dev-release": "node scripts/prepare-dev-release.js",
+    "prepare-dev-release:patch": "node scripts/prepare-dev-release.js --patch",
+    "prepare-dev-release:minor": "node scripts/prepare-dev-release.js --minor",
+    "prepare-dev-release:major": "node scripts/prepare-dev-release.js --major",
+    "prepare-dev-release:dryrun": "node scripts/prepare-dev-release.js --dry-run"
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.11.3",
