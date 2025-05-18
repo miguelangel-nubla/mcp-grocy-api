@@ -1,3 +1,12 @@
+## [1.3.3](https://github.com/saya6k/mcp-grocy-api/compare/v1.3.2...v1.3.3) (2025-05-18)
+
+
+### Bug Fixes
+
+* ci rework ([4a66611](https://github.com/saya6k/mcp-grocy-api/commit/4a66611661fb4630e40f15f8fa68aff646a68213))
+* remove redundant files ([2a4cb3d](https://github.com/saya6k/mcp-grocy-api/commit/2a4cb3d3b5f3693cefb217b77fbd8d59a0912827))
+* validate release in ci ([b57aca8](https://github.com/saya6k/mcp-grocy-api/commit/b57aca84cab090ae6d9b7240f205500f900d37f9))
+
 ## [1.3.3-dev.1](https://github.com/saya6k/mcp-grocy-api/compare/v1.3.2...v1.3.3-dev.1) (2025-05-18)
 
 
