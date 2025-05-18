@@ -1,3 +1,11 @@
+## [1.3.6](https://github.com/saya6k/mcp-grocy-api/compare/v1.3.5...v1.3.6) (2025-05-18)
+
+
+### Bug Fixes
+
+* install package locally before global in validate-release job ([8ed3385](https://github.com/saya6k/mcp-grocy-api/commit/8ed338563711b2cbb0d84ba17d2444a77411e653))
+* remove duplicate npm install command in validate-release job ([2f8d5eb](https://github.com/saya6k/mcp-grocy-api/commit/2f8d5eb893fccaeb6d29cd5a211ec706bbaad41f))
+
 ## [1.3.5](https://github.com/saya6k/mcp-grocy-api/compare/v1.3.4...v1.3.5) (2025-05-18)
 
 
