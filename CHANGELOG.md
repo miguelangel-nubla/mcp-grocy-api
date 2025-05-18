@@ -1,3 +1,10 @@
+## [1.3.4](https://github.com/saya6k/mcp-grocy-api/compare/v1.3.3...v1.3.4) (2025-05-18)
+
+
+### Bug Fixes
+
+* trigger release process in main branch ([aba21bf](https://github.com/saya6k/mcp-grocy-api/commit/aba21bf791651349ec61fc9420d253ec82acafc9))
+
 ## [1.3.3](https://github.com/saya6k/mcp-grocy-api/compare/v1.3.2...v1.3.3) (2025-05-18)
 
 
