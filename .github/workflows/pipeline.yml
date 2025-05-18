@@ -152,7 +152,7 @@ jobs:
           
           # Fetch all tags and history to ensure accurate version calculation
           echo "Fetching complete git history and tags for accurate versioning..."
-          git fetch --unshallow --tags
+          git fetch --tags --force
           
           # Show current version details
           echo "Current package version: $(node -p "require('./package.json').version")"
