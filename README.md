@@ -3,6 +3,8 @@
 [![npm version](https://img.shields.io/npm/v/mcp-grocy-api.svg)](https://www.npmjs.com/package/mcp-grocy-api)
 [![Docker Image](https://img.shields.io/badge/docker%20image-ghcr.io-blue)](https://github.com/saya6k/mcp-grocy-api/pkgs/container/mcp-grocy-api)
 [![License](https://img.shields.io/github/license/saya6k/mcp-grocy-api)](LICENSE)
+[![Configuration Status](https://github.com/saya6k/mcp-grocy-api/actions/workflows/validate-config.yml/badge.svg)](https://github.com/saya6k/mcp-grocy-api/actions/workflows/validate-config.yml)
+[![CI/CD Pipeline](https://github.com/saya6k/mcp-grocy-api/actions/workflows/pipeline.yml/badge.svg)](https://github.com/saya6k/mcp-grocy-api/actions/workflows/pipeline.yml)
 [![Buy Me a Coffee](https://img.shields.io/badge/Buy%20Me%20a%20Coffee-support-yellow.svg)](https://www.buymeacoffee.com/my7nmfcm92k)
 
 This project is a specialized fork of [mcp-rest-api](https://github.com/dkmaker/mcp-rest-api), refactored to work specifically with Grocy's API.
@@ -37,3 +39,22 @@ For Home Assistant addon specific documentation, see [DOCS.md](DOCS.md).
 ## API Reference
 
 For a complete list of all available API endpoints and examples, see [API Examples Documentation](./src/resources/examples.md).
+
+## Development
+
+### Release Process
+
+This project uses semantic-release for automated versioning and publishing. Two branches are configured:
+
+- `main`: Production releases that are published to npm
+- `dev`: Pre-releases for testing, with version tags in the format `v1.2.3-dev.1`
+
+To validate the release configuration:
+
+```bash
+npm run verify-release-config
+```
+
+This ensures that:
+1. The main branch correctly publishes to npm
+2. The dev branch creates pre-releases without npm publishing (avoiding token authentication errors)
