@@ -16,7 +16,7 @@ This addon allows you to run MCP server that communicates with Grocy API in your
 ```yaml
 grocy_base_url: http://a0d7b954-grocy:80
 grocy_api_key: your_api_key_here
-ssl_verify: false
+enable_ssl_verify: false
 response_size_limit: 10000
 ```
 
@@ -28,7 +28,7 @@ response_size_limit: 10000
 - Your Grocy API key.
 - You can find this in your Grocy settings.
 
-### Option: `ssl_verify` (optional)
+### Option: `enable_ssl_verify` (optional)
 - Set to `false` to disable SSL verification (useful for self-signed certificates).
 - Default: `true`
 
