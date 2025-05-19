@@ -58,7 +58,7 @@ jobs:
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
-  test-npm:
+  verify-npm-token:
     name: Verify NPM_TOKEN expiriration
     runs-on: ubuntu-latest
 
@@ -79,4 +79,156 @@ jobs:
             exit 1
           else
             echo "NPM_TOKEN secret is available"
-          fi          
+          fi
+
+  check-base-image:
+    name: Check Base Image for Hassio Addons
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+      
+      - name: Get Current Base Image Version
+        id: current-version
+        run: |
+          CURRENT_VERSION=$(grep -oP '(?<=ghcr.io/hassio-addons/base:)[0-9.]+' build.yaml | head -1)
+          echo "Current version: $CURRENT_VERSION"
+          echo "current_version=$CURRENT_VERSION" >> $GITHUB_OUTPUT
+      
+      - name: Get Latest Release Info
+        id: latest-release
+        uses: octokit/request-action@v2.x
+        with:
+          route: GET /repos/hassio-addons/addon-base/releases/latest
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      
+      - name: Extract Latest Version
+        id: extract-version
+        run: |
+          LATEST_VERSION=$(echo '${{ steps.latest-release.outputs.data }}' | jq -r '.tag_name' | sed 's/v//')
+          echo "Latest version: $LATEST_VERSION"
+          echo "latest_version=$LATEST_VERSION" >> $GITHUB_OUTPUT
+      
+      - name: Compare Versions
+        id: compare-versions
+        run: |
+          CURRENT_MAJOR=$(echo "${{ steps.current-version.outputs.current_version }}" | cut -d. -f1)
+          LATEST_MAJOR=$(echo "${{ steps.extract-version.outputs.latest_version }}" | cut -d. -f1)
+          
+          # Check if current version matches latest version within the same major version
+          if [ "$CURRENT_MAJOR" -eq "$LATEST_MAJOR" ]; then
+            if [ "${{ steps.current-version.outputs.current_version }}" == "${{ steps.extract-version.outputs.latest_version }}" ]; then
+              echo "✅ Base image is up to date with the latest version (${{ steps.current-version.outputs.current_version }})"
+              echo "status=pass" >> $GITHUB_OUTPUT
+            else
+              echo "⚠️ Base image is outdated: ${{ steps.current-version.outputs.current_version }} -> ${{ steps.extract-version.outputs.latest_version }}"
+              echo "status=fail" >> $GITHUB_OUTPUT
+            fi
+          else
+            echo "⚠️ Major version difference detected. Current: ${{ steps.current-version.outputs.current_version }}, Latest: ${{ steps.extract-version.outputs.latest_version }}"
+            # Don't fail for major version differences as these require manual review
+            echo "status=warn" >> $GITHUB_OUTPUT
+          fi
+      
+      - name: Verify Base Image Version
+        run: |
+          if [ "${{ steps.compare-versions.outputs.status }}" == "pass" ]; then
+            echo "✅ Base image version verification passed"
+            exit 0
+          elif [ "${{ steps.compare-versions.outputs.status }}" == "warn" ]; then
+            echo "⚠️ Major version change detected. Manual review required."
+            echo "Current version: ${{ steps.current-version.outputs.current_version }}"
+            echo "Latest version: ${{ steps.extract-version.outputs.latest_version }}"
+            echo "This is only a warning, test will pass"
+            exit 0
+          else
+            echo "❌ Base image is outdated. Update required."
+            echo "Current version: ${{ steps.current-version.outputs.current_version }}"
+            echo "Latest version: ${{ steps.extract-version.outputs.latest_version }}"
+            echo "Please update the base image in build.yaml to the latest version"
+            exit 1
+          fi
+
+  check-grocy-version:
+    name: Verify Grocy Version Compatibility
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+      
+      - name: Get Current Grocy Support Version
+        id: current-version
+        run: |
+          CURRENT_VERSION=$(grep -A 2 "Enhance Grocy API compatibility" CHANGELOG.md | grep -oP '(?<=version )[0-9]+\.[0-9]+\.[0-9]+' | head -1 || echo "0.0.0")
+          echo "Current supported version: $CURRENT_VERSION"
+          echo "current_version=$CURRENT_VERSION" >> $GITHUB_OUTPUT
+      
+      - name: Get Latest Grocy Release
+        id: latest-release
+        uses: octokit/request-action@v2.x
+        with:
+          route: GET /repos/grocy/grocy/releases/latest
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      
+      - name: Extract Latest Version
+        id: extract-version
+        run: |
+          LATEST_VERSION=$(echo '${{ steps.latest-release.outputs.data }}' | jq -r '.tag_name' | sed 's/v//')
+          echo "Latest Grocy version: $LATEST_VERSION"
+          echo "latest_version=$LATEST_VERSION" >> $GITHUB_OUTPUT
+      
+      - name: Compare Versions
+        id: compare-versions
+        run: |
+          # Extract version components
+          CURRENT_MAJOR=$(echo "${{ steps.current-version.outputs.current_version }}" | cut -d. -f1)
+          CURRENT_MINOR=$(echo "${{ steps.current-version.outputs.current_version }}" | cut -d. -f2)
+          LATEST_MAJOR=$(echo "${{ steps.extract-version.outputs.latest_version }}" | cut -d. -f1)
+          LATEST_MINOR=$(echo "${{ steps.extract-version.outputs.latest_version }}" | cut -d. -f2)
+          
+          # Determine compatibility status
+          if [ "${{ steps.current-version.outputs.current_version }}" == "${{ steps.extract-version.outputs.latest_version }}" ]; then
+            echo "✅ Supporting the latest Grocy version (${{ steps.current-version.outputs.current_version }})"
+            echo "status=pass" >> $GITHUB_OUTPUT
+          elif [ "$CURRENT_MAJOR" -lt "$LATEST_MAJOR" ]; then
+            echo "⚠️ Major version update available: ${{ steps.current-version.outputs.current_version }} -> ${{ steps.extract-version.outputs.latest_version }}"
+            echo "status=major" >> $GITHUB_OUTPUT
+          elif [ "$CURRENT_MAJOR" -eq "$LATEST_MAJOR" ] && [ "$CURRENT_MINOR" -lt "$LATEST_MINOR" ]; then
+            echo "⚠️ Minor version update available: ${{ steps.current-version.outputs.current_version }} -> ${{ steps.extract-version.outputs.latest_version }}"
+            echo "status=minor" >> $GITHUB_OUTPUT
+          else
+            echo "⚠️ Patch update available: ${{ steps.current-version.outputs.current_version }} -> ${{ steps.extract-version.outputs.latest_version }}"
+            echo "status=patch" >> $GITHUB_OUTPUT
+          fi
+      
+      - name: Verify Grocy Compatibility
+        run: |
+          if [ "${{ steps.compare-versions.outputs.status }}" == "pass" ]; then
+            echo "✅ Grocy compatibility verification passed"
+            exit 0
+          elif [ "${{ steps.compare-versions.outputs.status }}" == "major" ]; then
+            echo "⚠️ Major version difference detected. Manual update required."
+            echo "Current version: ${{ steps.current-version.outputs.current_version }}"
+            echo "Latest version: ${{ steps.extract-version.outputs.latest_version }}"
+            echo "Breaking changes might be present - you should update your compatibility before next release."
+            exit 1
+          elif [ "${{ steps.compare-versions.outputs.status }}" == "minor" ]; then
+            echo "⚠️ Minor version update available: ${{ steps.current-version.outputs.current_version }} -> ${{ steps.extract-version.outputs.latest_version }}"
+            echo "New features might be available - consider updating your compatibility before next release."
+            exit 1
+          else
+            echo "⚠️ Patch update available: ${{ steps.current-version.outputs.current_version }} -> ${{ steps.extract-version.outputs.latest_version }}"
+            echo "Bug fixes might be available - consider updating your compatibility."
+            exit 1
+          fi
+            enhancement
+            dependencies
+            ${{ steps.compare-versions.outputs.update_type }}
