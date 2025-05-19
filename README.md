@@ -27,6 +27,8 @@ docker run -p 8080:8080 -e GROCY_API_KEY=your_api_key -e GROCY_API_URL=http://yo
 
 ### Home Assistant Add-on
 
+[![Open your Home Assistant instance and show the add add-on repository dialog with a specific repository URL pre-filled.](https://my.home-assistant.io/badges/supervisor_add_addon_repository.svg)](https://my.home-assistant.io/redirect/supervisor_add_addon_repository/?repository_url=https%3A%2F%2Fgithub.com%2Fsaya6k%2Fhassio-addons)
+
 The MCP Grocy API is available as a Home Assistant add-on through [saya6k's add-on repository](https://github.com/saya6k/hassio-addons).
 
 ## Usage
