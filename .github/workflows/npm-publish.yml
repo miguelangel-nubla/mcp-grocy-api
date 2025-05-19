@@ -3,7 +3,7 @@ name: Publish Package to npm
 
 on:
   release:
-    types: [published, created] # Trigger on both published and created release events
+    types: [published] # Trigger only when a release is published (like docker-publish)
   workflow_dispatch: # Allows manual triggering
 
 permissions:
@@ -54,13 +54,26 @@ jobs:
           else
             echo "NPM_TOKEN secret is available"
           fi
+          
+      - name: Verify NPM_TOKEN secret
+        env:
+          # Don't actually print the token, just check if it's available
+          CHECK_TOKEN: ${{ secrets.NPM_TOKEN != '' }}
+        run: |
+          if [[ "$CHECK_TOKEN" != "true" ]]; then
+            echo "::error::NPM_TOKEN secret appears to be missing or empty"
+            echo "Please add an NPM_TOKEN secret in your repo settings: https://github.com/${{ github.repository }}/settings/secrets/actions"
+            echo "This should be an npm automation token with publish access"
+          else
+            echo "NPM_TOKEN secret is available"
+          fi
 
       - name: Get release version
         id: get_version
         run: |
           # Log detailed event information for debugging
           echo "Event name: ${{ github.event_name }}"
-          echo "Release event type: ${{ github.event.action }}" # Will show 'published', 'created', etc.
+          echo "Event action: ${{ github.event.action }}" # Will show 'published', etc.
           
           if [ "${{ github.event_name }}" == "release" ]; then
             # For release event, use the release tag
@@ -75,10 +88,27 @@ jobs:
             fi
             
             echo "Extracted version from tag: $VERSION"
+            
+            # Verify this version exists in package.json
+            PACKAGE_VERSION=$(node -p "require('./package.json').version")
+            echo "Current package.json version: $PACKAGE_VERSION"
+            
+            # If versions are different, we need to update the package.json (will do later)
+            if [ "$VERSION" != "$PACKAGE_VERSION" ]; then
+              echo "Note: package.json version ($PACKAGE_VERSION) differs from release tag ($VERSION)"
+              echo "Will update package.json before publishing"
+            fi
           else
             # For manual workflow or other trigger, use package.json version
             VERSION=$(node -p "require('./package.json').version")
             echo "Using version from package.json: $VERSION"
+            
+            # For manual triggers on dev versions, convert to release version if needed
+            if [[ "$VERSION" == *-dev* ]]; then
+              RELEASE_VERSION=$(echo "$VERSION" | sed -e 's/-dev.*$//')
+              echo "Converting dev version $VERSION to release version $RELEASE_VERSION for publishing"
+              VERSION="$RELEASE_VERSION"
+            fi
           fi
           
           # Check if version is valid semver
