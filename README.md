@@ -22,7 +22,7 @@ npm run build
 ### Docker
 
 ```bash
-docker run -p 8080:8080 -e GROCY_API_KEY=your_api_key -e GROCY_API_URL=http://your-grocy-instance ghcr.io/saya6k/mcp-grocy-api:latest
+docker run -e GROCY_APIKEY_VALUE=your_api_key -e GROCY_BASE_URL=http://your-grocy-instance ghcr.io/saya6k/mcp-grocy-api:latest
 ```
 
 ### Home Assistant Add-on
