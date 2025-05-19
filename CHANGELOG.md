@@ -1,3 +1,10 @@
+## [1.3.8-dev.1](https://github.com/saya6k/mcp-grocy-api/compare/v1.3.7...v1.3.8-dev.1) (2025-05-19)
+
+
+### Bug Fixes
+
+* fix in ci for docker versioning ([a9272dd](https://github.com/saya6k/mcp-grocy-api/commit/a9272dd8e67667131c43b21c6de5e6718d0503f3))
+
 ## [1.3.7](https://github.com/saya6k/mcp-grocy-api/compare/v1.3.6...v1.3.7) (2025-05-18)
 
 
