@@ -1,3 +1,11 @@
+## [1.3.12](https://github.com/saya6k/mcp-grocy-api/compare/v1.3.11...v1.3.12) (2025-05-19)
+
+
+### Bug Fixes
+
+* Fix Hassio-addon option to match ([464479e](https://github.com/saya6k/mcp-grocy-api/commit/464479e0fcc39185011198d52a3daaf4b23c9291))
+* Fix README commands to match ([40ed079](https://github.com/saya6k/mcp-grocy-api/commit/40ed079852fa6c7ca5e43a3cac908e8825be8462))
+
 ## [1.3.11](https://github.com/saya6k/mcp-grocy-api/compare/v1.3.10...v1.3.11) (2025-05-19)
 
 
