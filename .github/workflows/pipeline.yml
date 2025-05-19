@@ -111,7 +111,7 @@ jobs:
       
       # No need to set up NPM token since we publish via separate workflow
           
-      # Generate semantic version, changelog from commit messages, but don't publish to NPM
+      # Generate semantic version, changelog from commit messages, create GitHub release and don't publish to NPM
       - name: Run Semantic Release - Main Branch
         id: semantic-release
         if: github.ref == 'refs/heads/main'
@@ -120,7 +120,41 @@ jobs:
           # No NPM tokens needed since we publish via the separate npm-publish workflow
           # Enable debug mode for more verbose output
           DEBUG: "semantic-release:*"
-        run: npx semantic-release --debug
+        run: |
+          # Create an enhanced semantic-release config that prioritizes GitHub releases
+          cat > .releaserc.enhanced.json << EOF
+          {
+            "extends": "./.releaserc.json",
+            "plugins": [
+              "@semantic-release/commit-analyzer",
+              "@semantic-release/release-notes-generator",
+              "@semantic-release/changelog",
+              ["@semantic-release/npm", {"npmPublish": false}],
+              ["@semantic-release/exec", {
+                "prepareCmd": "sed -i 's/version: \"[0-9]*\\\\.[0-9]*\\\\.[0-9]*\"/version: \"${nextRelease.version}\"/' config.yaml"
+              }],
+              ["@semantic-release/git", {
+                "assets": ["package.json", "CHANGELOG.md", "config.yaml", "build/version.js"],
+                "message": "chore(release): ${nextRelease.version} [skip ci]\\n\\n${nextRelease.notes}"
+              }],
+              ["@semantic-release/github", {
+                "successComment": true,
+                "failComment": true,
+                "failTitle": "Release Failed",
+                "labels": ["release"],
+                "releasedLabels": ["released"],
+                "assets": []
+              }]
+            ]
+          }
+          EOF
+          
+          # Log which plugins are included
+          echo "Enhanced semantic-release configuration created."
+          echo "Explicitly including @semantic-release/github for release creation."
+          
+          # Run semantic-release with the enhanced config
+          npx semantic-release --debug --extends ./.releaserc.enhanced.json
         continue-on-error: false
       
       - name: Run Semantic Release - Dev Branch
@@ -180,10 +214,10 @@ jobs:
           }
         continue-on-error: false
       
-      # Store the new version number as an output variable
+      # Store the new version number as an output variable - always run for main branch
       - name: Get version from package.json
         id: package-version
-        if: (github.ref == 'refs/heads/main' && steps.semantic-release.outcome == 'success') || (github.ref == 'refs/heads/dev' && steps.semantic-release-dev.outcome == 'success')
+        if: github.ref == 'refs/heads/main' || (github.ref == 'refs/heads/dev' && steps.semantic-release-dev.outcome == 'success')
         run: echo "VERSION=$(node -p "require('./package.json').version")" >> $GITHUB_OUTPUT
 
       # Config.yaml version update is handled by semantic-release/exec plugin
@@ -195,13 +229,139 @@ jobs:
           VERSION=$(node -p "require('./package.json').version")
           echo "Created pre-release version $VERSION on dev branch (not updating config.yaml or publishing to npm)"
           
-      # Log version info for main branch
-      - name: Log version information
+      # Debug GitHub Release API access
+      - name: Debug GitHub Release API
+        if: github.ref == 'refs/heads/main'
+        run: |
+          echo "Testing GitHub API access for releases..."
+          VERSION=$(node -p "require('./package.json').version")
+          echo "Package version: $VERSION"
+          
+          # Test API access
+          echo "Checking GitHub API rate limits:"
+          curl -s -H "Authorization: token ${{ secrets.GITHUB_TOKEN }}" https://api.github.com/rate_limit
+          
+          echo "Listing recent releases:"
+          curl -s -H "Authorization: token ${{ secrets.GITHUB_TOKEN }}" https://api.github.com/repos/${{ github.repository }}/releases | head -n 30
+      
+      # Log version info for main branch and verify release was created
+      - name: Verify GitHub Release
         if: github.ref == 'refs/heads/main' && steps.semantic-release.outcome == 'success'
         run: |
           VERSION=$(node -p "require('./package.json').version")
           echo "Created release version $VERSION"
-          echo "The release will trigger the Docker and NPM publishing workflows automatically."
+          echo "-----------------------------------------------------"
+          echo "✅ GitHub Release created: v$VERSION"
+          echo "📦 The release will trigger the Docker and NPM publishing workflows automatically."
+          echo "-----------------------------------------------------"
+          
+          # Give GitHub API some time to propagate the release
+          echo "Waiting for GitHub release to propagate through GitHub's API..."
+          sleep 10
+          
+          # Verify GitHub release was created (try multiple times with increasing delays)
+          MAX_ATTEMPTS=5
+          for attempt in $(seq 1 $MAX_ATTEMPTS); do
+            echo "Verification attempt $attempt of $MAX_ATTEMPTS..."
+            
+            # Check if release exists by tag with proper error handling
+            RESPONSE=$(curl -s -w "%{http_code}" https://api.github.com/repos/${{ github.repository }}/releases/tags/v$VERSION)
+            HTTP_CODE=$(echo "$RESPONSE" | tail -n1)
+            BODY=$(echo "$RESPONSE" | sed '$ d')
+            
+            if [[ "$HTTP_CODE" == "200" ]] && echo "$BODY" | grep -q "\"id\":"; then
+              echo "✅ Success: GitHub Release v$VERSION was successfully created!"
+              echo "Release URL: https://github.com/${{ github.repository }}/releases/tag/v$VERSION"
+              exit 0
+            elif [[ "$HTTP_CODE" == "404" ]]; then
+              echo "Release not found yet (404). Continuing verification."
+            else
+              echo "API returned unexpected status code: $HTTP_CODE"
+              echo "Response body: $BODY"
+            fi
+            
+            if [ $attempt -lt $MAX_ATTEMPTS ]; then
+              echo "Waiting $(( attempt * 5 )) seconds before retrying..."
+              sleep $(( attempt * 5 ))
+            fi
+          done
+          
+          # If we got here, the release was not found after all attempts
+          echo "❌ Error: Could not verify GitHub Release v$VERSION was created after $MAX_ATTEMPTS attempts"
+          echo "Please check the GitHub releases page manually: https://github.com/${{ github.repository }}/releases"
+          exit 1
+
+      # Fallback: Create GitHub release guaranteed to work
+      - name: Create GitHub Release (Guaranteed Fallback)
+        if: github.ref == 'refs/heads/main' && (steps.semantic-release.outcome == 'success' || steps.semantic-release.outcome == 'failure')
+        run: |
+          VERSION=$(node -p "require('./package.json').version")
+          echo "Ensuring GitHub release exists for version v$VERSION..."
+          
+          # Check if the release already exists - use proper error handling
+          RELEASE_CHECK=$(curl -s -o /dev/null -w "%{http_code}" https://api.github.com/repos/${{ github.repository }}/releases/tags/v$VERSION)
+          
+          if [[ "$RELEASE_CHECK" == "404" ]]; then
+            echo "GitHub Release not found, creating manually..."
+            
+            # First create a git tag if it doesn't exist
+            if ! git rev-parse v$VERSION >/dev/null 2>&1; then
+              echo "Creating git tag v$VERSION..."
+              git config --local user.email "github-actions[bot]@users.noreply.github.com"
+              git config --local user.name "github-actions[bot]"
+              git tag v$VERSION
+              git push origin v$VERSION
+              echo "Tag v$VERSION created and pushed."
+            fi
+            
+            # Extract changelog
+            if [[ -f "CHANGELOG.md" ]]; then
+              echo "Extracting changelog section for v$VERSION..."
+              CHANGELOG_SECTION=$(sed -n "/## \[$VERSION\]/,/## \[/p" CHANGELOG.md | sed '$d')
+              
+              if [[ -z "$CHANGELOG_SECTION" ]]; then
+                echo "Changelog section not found, using commit messages instead."
+                CHANGELOG_SECTION="Release v$VERSION\n\nCommit changes:\n$(git log --pretty=format:'- %s' -5)"
+              fi
+            else
+              echo "No CHANGELOG.md found, using commit messages."
+              CHANGELOG_SECTION="Release v$VERSION\n\nCommit changes:\n$(git log --pretty=format:'- %s' -5)"
+            fi
+            
+            # Format changelog for JSON
+            CHANGELOG_JSON=$(echo "$CHANGELOG_SECTION" | sed 's/"/\\"/g' | sed ':a;N;$!ba;s/\n/\\n/g')
+            
+            # Create the release with proper error handling
+            echo "Creating GitHub release for v$VERSION..."
+            RESPONSE=$(curl -s -w "\n%{http_code}" \
+              -X POST \
+              -H "Authorization: token ${{ secrets.GITHUB_TOKEN }}" \
+              -H "Accept: application/vnd.github.v3+json" \
+              -d "{
+                \"tag_name\": \"v$VERSION\",
+                \"target_commitish\": \"${{ github.sha }}\",
+                \"name\": \"v$VERSION\",
+                \"body\": \"$CHANGELOG_JSON\",
+                \"draft\": false,
+                \"prerelease\": false
+              }" \
+              https://api.github.com/repos/${{ github.repository }}/releases)
+            
+            HTTP_CODE=$(echo "$RESPONSE" | tail -n1)
+            RESPONSE_BODY=$(echo "$RESPONSE" | head -n -1)
+            
+            if [[ "$HTTP_CODE" == "201" ]]; then
+              echo "✅ GitHub Release v$VERSION successfully created!"
+              RELEASE_URL=$(echo "$RESPONSE_BODY" | grep -o '"html_url":"[^"]*"' | cut -d'"' -f4)
+              echo "Release URL: $RELEASE_URL"
+            else
+              echo "❌ Failed to create GitHub Release. Status: $HTTP_CODE"
+              echo "Response: $RESPONSE_BODY"
+              echo "Will continue workflow regardless to allow other steps to proceed."
+            fi
+          else
+            echo "✅ GitHub Release v$VERSION already exists, skipping manual creation"
+          fi
 
 
   update-submodule:
@@ -272,7 +432,9 @@ jobs:
             git push
           fi
       
-      - name: Add new submodule
+      - name: Add new submodule if it doesn't exist
+        # This step will only run if the submodule doesn't exist
+        # and the previous step didn't find it in .gitignore
         if: steps.check-submodule.outputs.SUBMODULE_EXISTS == 'false'
         working-directory: hassio-addons
         run: |

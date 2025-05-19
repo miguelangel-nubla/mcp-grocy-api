@@ -1,3 +1,10 @@
+## [1.3.9-dev.3](https://github.com/saya6k/mcp-grocy-api/compare/v1.3.9-dev.2...v1.3.9-dev.3) (2025-05-19)
+
+
+### Bug Fixes
+
+* fix publishing in ci ([a996785](https://github.com/saya6k/mcp-grocy-api/commit/a996785066c87b922a00e987cd5a690730c1c945))
+
 ## [1.3.9-dev.2](https://github.com/saya6k/mcp-grocy-api/compare/v1.3.9-dev.1...v1.3.9-dev.2) (2025-05-19)
 
 ## [1.3.9-dev.1](https://github.com/saya6k/mcp-grocy-api/compare/v1.3.8...v1.3.9-dev.1) (2025-05-19)
