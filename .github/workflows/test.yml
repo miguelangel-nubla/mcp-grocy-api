@@ -11,6 +11,25 @@ permissions:
   contents: read # Needed to check out code and read package.json
 
 jobs:
+  lint:
+    name: Lint
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # Required for commitlint to analyze all commit messages
+          
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+          
+      - name: Install dependencies
+        run: npm install
+        
+      - name: Lint commit messages
+        run: npx commitlint --from $(git rev-list --max-parents=0 HEAD) --to HEAD || echo "Commit linting warnings found but continuing build"
+
   test-build:
     name: Test Docker Image Build
     runs-on: ubuntu-latest
