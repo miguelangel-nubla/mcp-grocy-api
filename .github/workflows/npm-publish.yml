@@ -3,7 +3,7 @@ name: Publish Package to npm
 
 on:
   release:
-    types: [published] # Trigger only when a new release is published
+    types: [published] # Trigger only when a release is published (like docker-publish)
   workflow_dispatch: # Allows manual triggering
 
 permissions:
@@ -18,28 +18,102 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # Fetch all history for proper versioning
+          fetch-tags: true # Fetch all tags to ensure release tag is available
+          
+      # If triggered by release, explicitly checkout the tag
+      - name: Checkout release tag if available
+        if: github.event_name == 'release'
+        run: |
+          echo "This workflow was triggered by a release event"
+          TAG_NAME="${{ github.event.release.tag_name }}"
+          echo "Release tag name: $TAG_NAME"
+          
+          # Checkout the specific tag to ensure we're building the right code
+          git checkout $TAG_NAME || {
+            echo "Warning: Failed to checkout tag $TAG_NAME"
+            echo "Falling back to the default checked-out code"
+          }
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
           node-version: '20'
           registry-url: 'https://registry.npmjs.org'
+          
+      - name: Verify NPM_TOKEN secret
+        env:
+          # Don't actually print the token, just check if it's available
+          CHECK_TOKEN: ${{ secrets.NPM_TOKEN != '' }}
+        run: |
+          if [[ "$CHECK_TOKEN" != "true" ]]; then
+            echo "::error::NPM_TOKEN secret appears to be missing or empty"
+            echo "Please add an NPM_TOKEN secret in your repo settings: https://github.com/${{ github.repository }}/settings/secrets/actions"
+            echo "This should be an npm automation token with publish access"
+          else
+            echo "NPM_TOKEN secret is available"
+          fi
+          
+      - name: Verify NPM_TOKEN secret
+        env:
+          # Don't actually print the token, just check if it's available
+          CHECK_TOKEN: ${{ secrets.NPM_TOKEN != '' }}
+        run: |
+          if [[ "$CHECK_TOKEN" != "true" ]]; then
+            echo "::error::NPM_TOKEN secret appears to be missing or empty"
+            echo "Please add an NPM_TOKEN secret in your repo settings: https://github.com/${{ github.repository }}/settings/secrets/actions"
+            echo "This should be an npm automation token with publish access"
+          else
+            echo "NPM_TOKEN secret is available"
+          fi
 
       - name: Get release version
         id: get_version
         run: |
+          # Log detailed event information for debugging
+          echo "Event name: ${{ github.event_name }}"
+          echo "Event action: ${{ github.event.action }}" # Will show 'published', etc.
+          
           if [ "${{ github.event_name }}" == "release" ]; then
             # For release event, use the release tag
             TAG_NAME="${{ github.event.release.tag_name }}"
+            echo "Release tag name: $TAG_NAME"
+            
             # Extract version from release tag (remove 'v' prefix if present)
             if [[ "$TAG_NAME" == v* ]]; then
               VERSION="${TAG_NAME#v}"
             else
               VERSION="$TAG_NAME"
             fi
+            
+            echo "Extracted version from tag: $VERSION"
+            
+            # Verify this version exists in package.json
+            PACKAGE_VERSION=$(node -p "require('./package.json').version")
+            echo "Current package.json version: $PACKAGE_VERSION"
+            
+            # If versions are different, we need to update the package.json (will do later)
+            if [ "$VERSION" != "$PACKAGE_VERSION" ]; then
+              echo "Note: package.json version ($PACKAGE_VERSION) differs from release tag ($VERSION)"
+              echo "Will update package.json before publishing"
+            fi
           else
-            # For manual workflow, use package.json version
+            # For manual workflow or other trigger, use package.json version
             VERSION=$(node -p "require('./package.json').version")
+            echo "Using version from package.json: $VERSION"
+            
+            # For manual triggers on dev versions, convert to release version if needed
+            if [[ "$VERSION" == *-dev* ]]; then
+              RELEASE_VERSION=$(echo "$VERSION" | sed -e 's/-dev.*$//')
+              echo "Converting dev version $VERSION to release version $RELEASE_VERSION for publishing"
+              VERSION="$RELEASE_VERSION"
+            fi
+          fi
+          
+          # Check if version is valid semver
+          if [[ ! "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+(-.*)?$ ]]; then
+            echo "Warning: Version '$VERSION' doesn't appear to be valid semver. Will continue anyway."
           fi
           
           echo "version=$VERSION" >> $GITHUB_OUTPUT
@@ -85,10 +159,49 @@ jobs:
             echo "Package version already matches release version: $RELEASE_VERSION"
           fi
 
-      # Publish to npm
+      # Publish to npm with better error handling and retries
       - name: Publish package
         if: steps.check_package.outputs.package_exists != 'true'
-        run: npm publish
+        run: |
+          echo "Checking npm configuration..."
+          npm config list
+          
+          # Debug npm registry settings
+          echo "NPM registry URL from npm config:"
+          npm config get registry
+          
+          # Debug token existence (never print the actual token)
+          if [ -n "$NODE_AUTH_TOKEN" ]; then
+            echo "NODE_AUTH_TOKEN is set (value not shown for security)"
+          else
+            echo "WARNING: NODE_AUTH_TOKEN appears to be empty!"
+          fi
+          
+          # Debug authentication
+          echo "Verifying npm authentication..."
+          npm whoami || {
+            echo "Failed to authenticate to npm registry"
+            echo "This could be due to token issues or network problems"
+          }
+          
+          echo "Checking package.json before publish..."
+          cat package.json
+          
+          # Ensure .npmrc is properly set up
+          echo "Creating/checking .npmrc file..."
+          echo "//registry.npmjs.org/:_authToken=\${NODE_AUTH_TOKEN}" > .npmrc
+          echo "registry=https://registry.npmjs.org/" >> .npmrc
+          echo "@modelcontextprotocol:registry=https://registry.npmjs.org/" >> .npmrc
+          
+          # Try publishing with different methods
+          echo "Publishing package to npm..."
+          npm publish --access public || {
+            echo "First publish attempt failed, trying again with verbose logging..."
+            npm publish --access public --verbose || {
+              echo "Second attempt failed, trying with explicit registry..."
+              npm publish --access public --registry=https://registry.npmjs.org/
+            }
+          }
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
 

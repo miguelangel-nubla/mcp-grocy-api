@@ -1,3 +1,11 @@
+## [1.3.10-dev.1](https://github.com/saya6k/mcp-grocy-api/compare/v1.3.9...v1.3.10-dev.1) (2025-05-19)
+
+
+### Bug Fixes
+
+* align npm-publish.yml with docker-publish.yml for consistent trigger events ([65580bb](https://github.com/saya6k/mcp-grocy-api/commit/65580bb78436456619663efa9fcd2e2141def33f))
+* improve npm publishing workflow reliability and debugging ([337bdd0](https://github.com/saya6k/mcp-grocy-api/commit/337bdd0811b86d6ab33dd336ff7ba4604ebc8f61))
+
 ## [1.3.9-dev.6](https://github.com/saya6k/mcp-grocy-api/compare/v1.3.9-dev.5...v1.3.9-dev.6) (2025-05-19)
 
 ## [1.3.9-dev.5](https://github.com/saya6k/mcp-grocy-api/compare/v1.3.9-dev.4...v1.3.9-dev.5) (2025-05-19)
