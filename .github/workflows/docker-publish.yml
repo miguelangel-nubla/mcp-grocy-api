@@ -1,5 +1,5 @@
 # .github/workflows/docker-publish.yml
-name: Build and Publish Docker Image to GHCR
+name: Publish Docker Image to GHCR
 
 on:
   release:
