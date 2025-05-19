@@ -58,8 +58,8 @@ jobs:
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
-  verify-npm-token:
-    name: Verify NPM_TOKEN expiriration
+  check-npm-token:
+    name: Check NPM TOKEN
     runs-on: ubuntu-latest
 
     steps:
@@ -154,7 +154,7 @@ jobs:
           fi
 
   check-grocy-version:
-    name: Verify Grocy Version Compatibility
+    name: Check Grocy Version Compatibility
     runs-on: ubuntu-latest
     
     steps:
@@ -181,7 +181,9 @@ jobs:
       - name: Extract Latest Version
         id: extract-version
         run: |
-          LATEST_VERSION=$(echo '${{ steps.latest-release.outputs.data }}' | jq -r '.tag_name' | sed 's/v//')
+          # Safely parse the JSON response using environment variable
+          echo "GITHUB_API_RESPONSE=${{ steps.latest-release.outputs.data }}" >> $GITHUB_ENV
+          LATEST_VERSION=$(echo "$GITHUB_API_RESPONSE" | jq -r '.tag_name' | sed 's/v//')
           echo "Latest Grocy version: $LATEST_VERSION"
           echo "latest_version=$LATEST_VERSION" >> $GITHUB_OUTPUT
       
