@@ -1,3 +1,10 @@
+## [1.3.9-dev.4](https://github.com/saya6k/mcp-grocy-api/compare/v1.3.9-dev.3...v1.3.9-dev.4) (2025-05-19)
+
+
+### Bug Fixes
+
+* improve semantic-release workflow for PR merges from dev to main ([53b8d13](https://github.com/saya6k/mcp-grocy-api/commit/53b8d134c999f4aefdb6a514ad952b31192668e7))
+
 ## [1.3.9-dev.3](https://github.com/saya6k/mcp-grocy-api/compare/v1.3.9-dev.2...v1.3.9-dev.3) (2025-05-19)
 
 
