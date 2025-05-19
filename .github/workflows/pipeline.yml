@@ -109,25 +109,15 @@ jobs:
           fi
           echo "Release configuration verification passed!"
       
-      # Conditionally setup npm token for main branch only
-      - name: Setup npm token for main branch
-        if: github.ref == 'refs/heads/main'
-        run: |
-          echo "//registry.npmjs.org/:_authToken=${{ secrets.NPM_TOKEN }}" > ~/.npmrc
-          echo "registry=https://registry.npmjs.org/" >> ~/.npmrc
-          echo "always-auth=true" >> ~/.npmrc
-          npm whoami || echo "npm token verification failed"
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+      # No need to set up NPM token since we publish via separate workflow
           
-      # Generate semantic version, changelog from commit messages, and publish to NPM if on main branch
+      # Generate semantic version, changelog from commit messages, but don't publish to NPM
       - name: Run Semantic Release - Main Branch
         id: semantic-release
         if: github.ref == 'refs/heads/main'
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
-          NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
+          # No NPM tokens needed since we publish via the separate npm-publish workflow
           # Enable debug mode for more verbose output
           DEBUG: "semantic-release:*"
         run: npx semantic-release --debug
@@ -205,14 +195,13 @@ jobs:
           VERSION=$(node -p "require('./package.json').version")
           echo "Created pre-release version $VERSION on dev branch (not updating config.yaml or publishing to npm)"
           
-      # Verify NPM publishing for main branch
-      - name: Verify NPM publish
+      # Log version info for main branch
+      - name: Log version information
         if: github.ref == 'refs/heads/main' && steps.semantic-release.outcome == 'success'
         run: |
           VERSION=$(node -p "require('./package.json').version")
-          echo "Release version $VERSION was published to npm"
-          # Check if package was published successfully
-          npm view mcp-grocy-api version | grep $VERSION && echo "✅ Successfully published to npm" || echo "⚠️ Publication to npm could not be verified"
+          echo "Created release version $VERSION"
+          echo "The release will trigger the Docker and NPM publishing workflows automatically."
 
 
   update-submodule:

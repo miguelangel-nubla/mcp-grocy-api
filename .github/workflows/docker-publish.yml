@@ -2,13 +2,12 @@
 name: Build and Publish Docker Image to GHCR
 
 on:
-  push:
-    branches:
-      - main # Trigger on push to main branch
+  release:
+    types: [published] # Trigger only when a new release is published
   workflow_dispatch: # Allows manual triggering
 
 permissions:
-  contents: read # Needed to check out code, read package.json, and read release info
+  contents: read # Needed to check out code
   packages: write # Needed to push Docker image to GHCR
 
 jobs:
@@ -20,77 +19,66 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Set up Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: '20'
-
-      - name: Extract version from package.json
+      - name: Get release version
         id: get_version
-        run: echo "version=$(node -p "require('./package.json').version")" >> $GITHUB_OUTPUT
-
-      - name: Check if version is a development version
-        id: check_version
         run: |
-          VERSION="${{ steps.get_version.outputs.version }}"
-          if [[ "$VERSION" == *-dev* ]]; then
-            echo "Version $VERSION is a development version, skipping Docker build"
-            echo "should_build=false" >> $GITHUB_OUTPUT
-          else
-            echo "Version $VERSION is a stable version"
-
-            # Get latest release and compare versions
-            echo "Checking if we need to build for version $VERSION..."
-            
-            LATEST_TAG=$(curl -s https://api.github.com/repos/${{ github.repository }}/releases/latest | jq -r '.tag_name')
-            if [ "$LATEST_TAG" == "null" ]; then
-              echo "No releases found. Build needed."
-              echo "should_build=true" >> $GITHUB_OUTPUT
+          if [ "${{ github.event_name }}" == "release" ]; then
+            # For release event, use the release tag
+            TAG_NAME="${{ github.event.release.tag_name }}"
+            # Extract version from release tag (remove 'v' prefix if present)
+            if [[ "$TAG_NAME" == v* ]]; then
+              VERSION="${TAG_NAME#v}"
             else
-              # Extract version from tag (remove 'v' prefix if present)
-              LATEST_VERSION=${LATEST_TAG#v}
-              echo "Latest release version: $LATEST_VERSION"
-              
-              if [ "$VERSION" != "$LATEST_VERSION" ]; then
-                echo "Version mismatch. Build needed."
-                echo "should_build=true" >> $GITHUB_OUTPUT
-              else
-                echo "Versions match. No build needed."
-                echo "should_build=false" >> $GITHUB_OUTPUT
-              fi
+              VERSION="$TAG_NAME"
             fi
+          else
+            # For manual workflow, use package.json version
+            VERSION=$(node -p "require('./package.json').version")
           fi
+          
+          # Check if it's a development version
+          if [[ "$VERSION" == *-dev* ]]; then
+            echo "::warning::This is a development version ($VERSION). Consider only publishing stable versions."
+          fi
+          
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          echo "Building Docker image for version: $VERSION"
 
+      # Check if this version already exists in the registry
       - name: Log in to GitHub Container Registry
-        if: steps.check_version.outputs.should_build == 'true'
         uses: docker/login-action@v3
         with:
           registry: ghcr.io
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      # Set up QEMU for multi-platform builds
+      - name: Check if image already exists
+        id: check_image
+        run: |
+          VERSION="${{ steps.get_version.outputs.version }}"
+          echo "Checking if Docker image for version $VERSION already exists..."
+          
+          # Try to pull the image manifest - will fail if it doesn't exist
+          if docker buildx imagetools inspect ghcr.io/${{ github.repository }}:$VERSION &>/dev/null; then
+            echo "Image already exists in registry. Skipping build."
+            echo "image_exists=true" >> $GITHUB_OUTPUT
+          else
+            echo "Image does not exist yet. Proceeding with build."
+            echo "image_exists=false" >> $GITHUB_OUTPUT
+          fi
+
+      # Set up for multi-architecture builds
       - name: Set up QEMU
-        if: steps.check_version.outputs.should_build == 'true'
+        if: steps.check_image.outputs.image_exists != 'true'
         uses: docker/setup-qemu-action@v3
       
       - name: Set up Docker Buildx
-        if: steps.check_version.outputs.should_build == 'true'
+        if: steps.check_image.outputs.image_exists != 'true'
         uses: docker/setup-buildx-action@v3
       
-      - name: Extract metadata for Docker
-        if: steps.check_version.outputs.should_build == 'true'
-        id: meta
-        uses: docker/metadata-action@v5
-        with:
-          images: ghcr.io/${{ github.repository }}
-          tags: |
-            type=raw,value=${{ steps.get_version.outputs.version }}
-            type=raw,value=latest
-      
-      # Build for AMD64 first (most systems)
+      # Build AMD64 image
       - name: Build and push AMD64 image
-        if: steps.check_version.outputs.should_build == 'true'
+        if: steps.check_image.outputs.image_exists != 'true'
         uses: docker/build-push-action@v5
         with:
           context: .
@@ -102,9 +90,9 @@ jobs:
           cache-from: type=registry,ref=ghcr.io/${{ github.repository }}:latest-amd64
           cache-to: type=inline
       
-      # Build ARM64 separately with special settings
+      # Build ARM64 image with memory settings for ARM builds
       - name: Build and push ARM64 image
-        if: steps.check_version.outputs.should_build == 'true'
+        if: steps.check_image.outputs.image_exists != 'true'
         uses: docker/build-push-action@v5
         with:
           context: .
@@ -117,9 +105,9 @@ jobs:
           cache-from: type=registry,ref=ghcr.io/${{ github.repository }}:latest-arm64
           cache-to: type=inline
       
-      # Create a manifest that includes both architectures
+      # Create multi-architecture manifest
       - name: Create and push manifest
-        if: steps.check_version.outputs.should_build == 'true'
+        if: steps.check_image.outputs.image_exists != 'true'
         run: |
           docker buildx imagetools create -t ghcr.io/${{ github.repository }}:${{ steps.get_version.outputs.version }} \
             ghcr.io/${{ github.repository }}:${{ steps.get_version.outputs.version }}-amd64 \
@@ -128,3 +116,13 @@ jobs:
           docker buildx imagetools create -t ghcr.io/${{ github.repository }}:latest \
             ghcr.io/${{ github.repository }}:latest-amd64 \
             ghcr.io/${{ github.repository }}:latest-arm64
+            
+      # Summary
+      - name: Workflow Summary
+        run: |
+          VERSION="${{ steps.get_version.outputs.version }}"
+          if [[ "${{ steps.check_image.outputs.image_exists }}" == "true" ]]; then
+            echo "Image for version $VERSION already exists in the registry. No new image was built."
+          else
+            echo "Successfully built and published Docker image for version $VERSION."
+          fi
