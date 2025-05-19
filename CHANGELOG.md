@@ -1,3 +1,12 @@
+## [1.3.9-dev.6](https://github.com/saya6k/mcp-grocy-api/compare/v1.3.9-dev.5...v1.3.9-dev.6) (2025-05-19)
+
+## [1.3.9-dev.5](https://github.com/saya6k/mcp-grocy-api/compare/v1.3.9-dev.4...v1.3.9-dev.5) (2025-05-19)
+
+
+### Bug Fixes
+
+* force GitHub release creation when merging PR to main ([ae4ec21](https://github.com/saya6k/mcp-grocy-api/commit/ae4ec21f032574a47004ef12b24950d4072249a9))
+
 ## [1.3.9-dev.4](https://github.com/saya6k/mcp-grocy-api/compare/v1.3.9-dev.3...v1.3.9-dev.4) (2025-05-19)
 
 

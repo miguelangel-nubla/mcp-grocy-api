@@ -332,28 +332,55 @@ jobs:
           
           echo "Proceeding with workflow - fallback release mechanism will create release if needed."
 
-      # Fallback: Create GitHub release guaranteed to work - ALWAYS runs on main
-      - name: Create GitHub Release (Guaranteed Fallback)
+      # Forceful GitHub release creation - ALWAYS runs on main branch
+      - name: Force Create GitHub Release
         if: github.ref == 'refs/heads/main'
         run: |
-          VERSION=$(node -p "require('./package.json').version")
-          echo "Ensuring GitHub release exists for version v$VERSION..."
+          # Force increment version if necessary for release
+          NEED_VERSION_INCREMENT=false
+          CURR_VERSION=$(node -p "require('./package.json').version")
           
-          # Check if the release already exists - use proper error handling
-          RELEASE_CHECK=$(curl -s -o /dev/null -w "%{http_code}" https://api.github.com/repos/${{ github.repository }}/releases/tags/v$VERSION)
+          # Check if current version is a dev version
+          if [[ "$CURR_VERSION" == *-dev* ]]; then
+            echo "Current version $CURR_VERSION is a development version - need to convert to release version"
+            # Strip dev suffix to create release version
+            RELEASE_VERSION=$(echo "$CURR_VERSION" | sed -e 's/-dev.*$//')
+            NEED_VERSION_INCREMENT=true
+          elif git tag -l "v$CURR_VERSION" | grep -q "v$CURR_VERSION"; then
+            echo "Version $CURR_VERSION already exists as a tag - need to increment for new release"
+            # Split version into components and increment patch
+            IFS='.' read -r MAJOR MINOR PATCH <<< "$CURR_VERSION"
+            RELEASE_VERSION="$MAJOR.$MINOR.$((PATCH + 1))"
+            NEED_VERSION_INCREMENT=true
+          else
+            RELEASE_VERSION="$CURR_VERSION"
+          fi
           
-          if [[ "$RELEASE_CHECK" == "404" ]]; then
-            echo "GitHub Release not found, creating manually..."
-            
-            # First create a git tag if it doesn't exist
-            if ! git rev-parse v$VERSION >/dev/null 2>&1; then
-              echo "Creating git tag v$VERSION..."
-              git config --local user.email "github-actions[bot]@users.noreply.github.com"
-              git config --local user.name "github-actions[bot]"
-              git tag v$VERSION
-              git push origin v$VERSION
-              echo "Tag v$VERSION created and pushed."
+          if [[ "$NEED_VERSION_INCREMENT" == "true" ]]; then
+            echo "Updating version from $CURR_VERSION to $RELEASE_VERSION"
+            # Update package.json version
+            npm version $RELEASE_VERSION --no-git-tag-version
+            # Also update config.yaml if it exists
+            if [ -f "config.yaml" ]; then
+              sed -i "s/version: \"[0-9]*\.[0-9]*\.[0-9]*\"/version: \"$RELEASE_VERSION\"/" config.yaml
             fi
+          fi
+          
+          VERSION="$RELEASE_VERSION"
+          echo "Using version $VERSION for GitHub release"
+          
+          # Always create a new release regardless of existing state
+          echo "Creating GitHub release for version v$VERSION..."
+          
+          # First create a git tag if it doesn't exist
+          if ! git rev-parse v$VERSION >/dev/null 2>&1; then
+            echo "Creating git tag v$VERSION..."
+            git config --local user.email "github-actions[bot]@users.noreply.github.com"
+            git config --local user.name "github-actions[bot]"
+            git tag v$VERSION
+            git push origin v$VERSION
+            echo "Tag v$VERSION created and pushed."
+          fi
             
             # Extract changelog
             if [[ -f "CHANGELOG.md" ]]; then
@@ -401,9 +428,27 @@ jobs:
               fi
             fi
             
-            # Create the release with proper error handling
+            # First check if a release already exists for this tag and delete it if necessary 
+            RELEASE_CHECK=$(curl -s -w "\n%{http_code}" https://api.github.com/repos/${{ github.repository }}/releases/tags/v$VERSION)
+            HTTP_CHECK=$(echo "$RELEASE_CHECK" | tail -n1)
+            RELEASE_BODY=$(echo "$RELEASE_CHECK" | head -n -1)
+            
+            RELEASE_ID=""
+            if [[ "$HTTP_CHECK" == "200" ]]; then
+              # Extract release ID from response
+              RELEASE_ID=$(echo "$RELEASE_BODY" | grep -o '"id": [0-9]*' | head -n1 | awk '{print $2}')
+              echo "Found existing release with ID: $RELEASE_ID"
+              
+              echo "Deleting existing release to create a fresh one..."
+              curl -s -X DELETE \
+                -H "Authorization: token ${{ secrets.GITHUB_TOKEN }}" \
+                -H "Accept: application/vnd.github.v3+json" \
+                https://api.github.com/repos/${{ github.repository }}/releases/$RELEASE_ID
+            fi
+            
+            # Create a new release
             echo "Creating GitHub release for v$VERSION..."
-            RESPONSE=$(curl -s -w "\n%{http_code}" \
+            CREATE_RESPONSE=$(curl -s -w "\n%{http_code}" \
               -X POST \
               -H "Authorization: token ${{ secrets.GITHUB_TOKEN }}" \
               -H "Accept: application/vnd.github.v3+json" \
@@ -413,25 +458,61 @@ jobs:
                 \"name\": \"v$VERSION\",
                 \"body\": \"$CHANGELOG_JSON\",
                 \"draft\": false,
-                \"prerelease\": false
+                \"prerelease\": false,
+                \"generate_release_notes\": false
               }" \
               https://api.github.com/repos/${{ github.repository }}/releases)
             
-            HTTP_CODE=$(echo "$RESPONSE" | tail -n1)
-            RESPONSE_BODY=$(echo "$RESPONSE" | head -n -1)
+            CREATE_HTTP_CODE=$(echo "$CREATE_RESPONSE" | tail -n1)
+            CREATE_BODY=$(echo "$CREATE_RESPONSE" | head -n -1)
             
-            if [[ "$HTTP_CODE" == "201" ]]; then
+            if [[ "$CREATE_HTTP_CODE" == "201" ]]; then
               echo "✅ GitHub Release v$VERSION successfully created!"
-              RELEASE_URL=$(echo "$RESPONSE_BODY" | grep -o '"html_url":"[^"]*"' | cut -d'"' -f4)
+              RELEASE_URL=$(echo "$CREATE_BODY" | grep -o '"html_url":"[^"]*"' | cut -d'"' -f4)
               echo "Release URL: $RELEASE_URL"
+              
+              # Write the version to GitHub outputs to ensure other jobs can use it
+              echo "VERSION=$VERSION" >> $GITHUB_OUTPUT
+              
+              # Make sure docker-publish and npm-publish workflows are triggered
+              echo "To trigger Docker and NPM publishing:"
+              echo "1. The GitHub Release v$VERSION is now published"
+              echo "2. Docker publishing should trigger automatically"
+              echo "3. NPM publishing should trigger automatically"
             else
-              echo "❌ Failed to create GitHub Release. Status: $HTTP_CODE"
-              echo "Response: $RESPONSE_BODY"
-              echo "Will continue workflow regardless to allow other steps to proceed."
+              echo "❌ Failed to create GitHub Release. Status: $CREATE_HTTP_CODE"
+              echo "Response: $CREATE_BODY"
+              echo "Will try a simpler approach..."
+              
+              # Fallback with simpler payload
+              SIMPLE_RESPONSE=$(curl -s -w "\n%{http_code}" \
+                -X POST \
+                -H "Authorization: token ${{ secrets.GITHUB_TOKEN }}" \
+                -H "Accept: application/vnd.github.v3+json" \
+                -d "{
+                  \"tag_name\": \"v$VERSION\",
+                  \"target_commitish\": \"${{ github.sha }}\",
+                  \"name\": \"v$VERSION\",
+                  \"body\": \"Release version $VERSION\",
+                  \"draft\": false,
+                  \"prerelease\": false
+                }" \
+                https://api.github.com/repos/${{ github.repository }}/releases)
+                
+              SIMPLE_HTTP_CODE=$(echo "$SIMPLE_RESPONSE" | tail -n1)
+              SIMPLE_BODY=$(echo "$SIMPLE_RESPONSE" | head -n -1)
+              
+              if [[ "$SIMPLE_HTTP_CODE" == "201" ]]; then
+                echo "✅ GitHub Release v$VERSION created with simplified payload!"
+                RELEASE_URL=$(echo "$SIMPLE_BODY" | grep -o '"html_url":"[^"]*"' | cut -d'"' -f4)
+                echo "Release URL: $RELEASE_URL"
+                
+                # Write the version to GitHub outputs
+                echo "VERSION=$VERSION" >> $GITHUB_OUTPUT
+              else
+                echo "❌ All attempts to create GitHub Release failed. Status: $SIMPLE_HTTP_CODE"
+              fi
             fi
-          else
-            echo "✅ GitHub Release v$VERSION already exists, skipping manual creation"
-          fi
           
       # Final release check and summary
       - name: Final Release Check
