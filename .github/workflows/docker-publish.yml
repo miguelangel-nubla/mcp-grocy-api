@@ -29,48 +29,40 @@ jobs:
         id: get_version
         run: echo "version=$(node -p "require('./package.json').version")" >> $GITHUB_OUTPUT
 
-      - name: Compare package version with latest release tag
-        id: compare_versions
-        uses: actions/github-script@v7
-        with:
-          script: |
-            const packageVersion = "${{ steps.get_version.outputs.version }}";
-            console.log(`Package version: ${packageVersion}`);
+      - name: Check if version is a development version
+        id: check_version
+        run: |
+          VERSION="${{ steps.get_version.outputs.version }}"
+          if [[ "$VERSION" == *-dev* ]]; then
+            echo "Version $VERSION is a development version, skipping Docker build"
+            echo "should_build=false" >> $GITHUB_OUTPUT
+          else
+            echo "Version $VERSION is a stable version"
 
-            try {
-              const latestRelease = await github.rest.repos.getLatestRelease({
-                owner: context.repo.owner,
-                repo: context.repo.repo,
-              });
-
-              const latestTag = latestRelease.data.tag_name;
-              console.log(`Latest release tag: ${latestTag}`);
-
-              // Assuming tag is like 'v1.2.3', remove 'v' prefix
-              const latestVersion = latestTag.startsWith('v') ? latestTag.substring(1) : latestTag;
-              console.log(`Latest release version: ${latestVersion}`);
-
-              if (packageVersion !== latestVersion) {
-                console.log('Version mismatch. Build needed.');
-                core.setOutput('needs_build', 'true');
-              } else {
-                console.log('Versions match. No build needed.');
-                core.setOutput('needs_build', 'false');
-              }
-            } catch (error) {
-              // Handle case where no releases exist yet or API error
-              if (error.status === 404) {
-                console.log('No releases found. Build needed.');
-                core.setOutput('needs_build', 'true');
-              } else {
-                console.error('Error fetching latest release:', error);
-                core.setFailed(`Error fetching latest release: ${error.message}`);
-                core.setOutput('needs_build', 'false'); // Don't build on error
-              }
-            }
+            # Get latest release and compare versions
+            echo "Checking if we need to build for version $VERSION..."
+            
+            LATEST_TAG=$(curl -s https://api.github.com/repos/${{ github.repository }}/releases/latest | jq -r '.tag_name')
+            if [ "$LATEST_TAG" == "null" ]; then
+              echo "No releases found. Build needed."
+              echo "should_build=true" >> $GITHUB_OUTPUT
+            else
+              # Extract version from tag (remove 'v' prefix if present)
+              LATEST_VERSION=${LATEST_TAG#v}
+              echo "Latest release version: $LATEST_VERSION"
+              
+              if [ "$VERSION" != "$LATEST_VERSION" ]; then
+                echo "Version mismatch. Build needed."
+                echo "should_build=true" >> $GITHUB_OUTPUT
+              else
+                echo "Versions match. No build needed."
+                echo "should_build=false" >> $GITHUB_OUTPUT
+              fi
+            fi
+          fi
 
       - name: Log in to GitHub Container Registry
-        if: steps.compare_versions.outputs.needs_build == 'true'
+        if: steps.check_version.outputs.should_build == 'true'
         uses: docker/login-action@v3
         with:
           registry: ghcr.io
@@ -79,15 +71,15 @@ jobs:
 
       # Set up QEMU for multi-platform builds
       - name: Set up QEMU
-        if: steps.compare_versions.outputs.needs_build == 'true'
+        if: steps.check_version.outputs.should_build == 'true'
         uses: docker/setup-qemu-action@v3
       
       - name: Set up Docker Buildx
-        if: steps.compare_versions.outputs.needs_build == 'true'
+        if: steps.check_version.outputs.should_build == 'true'
         uses: docker/setup-buildx-action@v3
       
       - name: Extract metadata for Docker
-        if: steps.compare_versions.outputs.needs_build == 'true'
+        if: steps.check_version.outputs.should_build == 'true'
         id: meta
         uses: docker/metadata-action@v5
         with:
@@ -98,7 +90,7 @@ jobs:
       
       # Build for AMD64 first (most systems)
       - name: Build and push AMD64 image
-        if: steps.compare_versions.outputs.needs_build == 'true'
+        if: steps.check_version.outputs.should_build == 'true'
         uses: docker/build-push-action@v5
         with:
           context: .
@@ -112,7 +104,7 @@ jobs:
       
       # Build ARM64 separately with special settings
       - name: Build and push ARM64 image
-        if: steps.compare_versions.outputs.needs_build == 'true'
+        if: steps.check_version.outputs.should_build == 'true'
         uses: docker/build-push-action@v5
         with:
           context: .
@@ -127,7 +119,7 @@ jobs:
       
       # Create a manifest that includes both architectures
       - name: Create and push manifest
-        if: steps.compare_versions.outputs.needs_build == 'true'
+        if: steps.check_version.outputs.should_build == 'true'
         run: |
           docker buildx imagetools create -t ghcr.io/${{ github.repository }}:${{ steps.get_version.outputs.version }} \
             ghcr.io/${{ github.repository }}:${{ steps.get_version.outputs.version }}-amd64 \
