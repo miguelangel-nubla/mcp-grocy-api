@@ -171,19 +171,13 @@ jobs:
           echo "current_version=$CURRENT_VERSION" >> $GITHUB_OUTPUT
       
       - name: Get Latest Grocy Release
-        id: latest-release
-        uses: octokit/request-action@v2.x
-        with:
-          route: GET /repos/grocy/grocy/releases/latest
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      
-      - name: Extract Latest Version
         id: extract-version
         run: |
-          # Safely parse the JSON response using environment variable
-          echo "GITHUB_API_RESPONSE=${{ steps.latest-release.outputs.data }}" >> $GITHUB_ENV
-          LATEST_VERSION=$(echo "$GITHUB_API_RESPONSE" | jq -r '.tag_name' | sed 's/v//')
+          # Use curl and grep to extract the latest version - safer approach
+          RESPONSE=$(curl -s -H "Accept: application/vnd.github+json" https://api.github.com/repos/grocy/grocy/releases/latest)
+          TAG=$(echo "$RESPONSE" | grep -o '"tag_name": *"[^"]*"' | cut -d'"' -f4)
+          LATEST_VERSION=${TAG#v}  # Remove the 'v' prefix if present
+          
           echo "Latest Grocy version: $LATEST_VERSION"
           echo "latest_version=$LATEST_VERSION" >> $GITHUB_OUTPUT
       
