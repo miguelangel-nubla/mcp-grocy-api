@@ -9,6 +9,13 @@ This addon allows you to run MCP server that communicates with Grocy API in your
 
 2. Find the "MCP Grocy API" addon and click Install.
 
+
+## How-to-use
+
+You cannot use this with [Model Context Protocol](https://www.home-assistant.io/integrations/mcp) alone.
+
+For now, you must use it with MCP Proxy in order to communicate with stdio protocol.
+
 ## Configuration
 
 ### Addon Configuration
@@ -39,6 +46,8 @@ response_size_limit: 10000
 ## Communication
 
 This addon communicates with Home Assistant via standard input/output (stdio) and does not expose any ports. It is designed to be used as a backend service without direct network access.
+
+Someday SSE protocol support can arrive.
 
 ## Support
 
