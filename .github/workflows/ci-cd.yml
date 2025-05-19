@@ -362,10 +362,120 @@ jobs:
             echo "Successfully published NPM package version $VERSION."
           fi
 
+  publish-hassio-addons:
+    name: Publish to Hass.io Addons
+    runs-on: ubuntu-latest
+    needs: [release]
+    # Always update the submodule for main branch pushes - no version condition
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    steps:
+      # Get the current project for updating config.yaml
+      - name: Checkout current repository
+        uses: actions/checkout@v4
+        with:
+          path: current-repo
+          
+      # Update version in config.yaml to match the release
+      - name: Update version in config.yaml
+        if: needs.release.outputs.new_release_published == 'true'
+        working-directory: current-repo
+        run: |
+          VERSION="${{ needs.release.outputs.new_release_version }}"
+          echo "Updating config.yaml to version $VERSION"
+          sed -i "s/version: \"[0-9]*\.[0-9]*\.[0-9]*\"/version: \"$VERSION\"/" config.yaml
+          cat config.yaml | grep version
+          
+          # Commit the change to the repository
+          git config --local user.email "github-actions[bot]@users.noreply.github.com"
+          git config --local user.name "github-actions[bot]"
+          git add config.yaml
+          git commit -m "chore(release): update config.yaml to version $VERSION [skip ci]"
+          git push
+      
+      - name: Checkout hassio-addons repository
+        uses: actions/checkout@v4
+        with:
+          repository: saya6k/hassio-addons
+          token: ${{ secrets.HASSIO_ADDONS_TOKEN }}
+          path: hassio-addons
+
+      - name: Setup Git configuration
+        working-directory: hassio-addons
+        run: |
+          git config --local user.email "github-actions[bot]@users.noreply.github.com"
+          git config --local user.name "github-actions[bot]"
+      
+      - name: Check if submodule exists
+        id: check-submodule
+        working-directory: hassio-addons
+        run: |
+          if grep -q "mcp-grocy-api" .gitmodules 2>/dev/null; then
+            echo "SUBMODULE_EXISTS=true" >> $GITHUB_OUTPUT
+          else
+            echo "SUBMODULE_EXISTS=false" >> $GITHUB_OUTPUT
+          fi
+      
+      - name: Update existing submodule
+        if: steps.check-submodule.outputs.SUBMODULE_EXISTS == 'true'
+        working-directory: hassio-addons
+        run: |
+          # More robust submodule update that doesn't fail if there are issues with other submodules
+          git config -f .gitmodules --get-regexp '^submodule\.mcp-grocy-api\.path$' || true
+          
+          # Check if the directory exists and is a git repository
+          if [ -d "mcp-grocy-api" ] && [ -d "mcp-grocy-api/.git" ]; then
+            cd mcp-grocy-api
+            git fetch
+            git checkout main
+            git pull
+            cd ..
+          else
+            # If directory doesn't exist or isn't a git repo, initialize just this submodule
+            git submodule init mcp-grocy-api
+            git submodule update --remote mcp-grocy-api
+          fi
+          
+          # Commit the updated submodule
+          git add mcp-grocy-api
+          git commit -m "chore: update mcp-grocy-api submodule to latest version" || echo "No changes to commit"
+          git push || echo "No changes to push"
+      
+      - name: Check and update gitignore
+        if: steps.check-submodule.outputs.SUBMODULE_EXISTS == 'false'
+        working-directory: hassio-addons
+        run: |
+          # Check if mcp-grocy-api is in .gitignore
+          if grep -q "mcp-grocy-api" .gitignore 2>/dev/null; then
+            # Remove or comment out the line from .gitignore
+            sed -i 's/mcp-grocy-api/#mcp-grocy-api - submodule now/g' .gitignore
+            git add .gitignore
+            git commit -m "chore: update .gitignore to allow mcp-grocy-api submodule"
+            git push
+          fi
+      
+      - name: Add new submodule if it doesn't exist
+        # This step will only run if the submodule doesn't exist
+        # and the previous step didn't find it in .gitignore
+        if: steps.check-submodule.outputs.SUBMODULE_EXISTS == 'false'
+        working-directory: hassio-addons
+        run: |
+          # Add the new submodule with force flag
+          git submodule add -f https://github.com/saya6k/mcp-grocy-api.git mcp-grocy-api
+          
+          # Directly initialize just this submodule without trying to init others
+          cd mcp-grocy-api
+          git checkout main
+          cd ..
+          
+          # Commit the new submodule
+          git add .gitmodules mcp-grocy-api
+          git commit -m "chore: add mcp-grocy-api submodule"
+          git push
+
   sync-dev:
     name: Sync Dev Branch with Main
     runs-on: ubuntu-latest
-    needs: [release, publish-docker, publish-npm]
+    needs: [release, publish-docker, publish-npm, publish-hassio-addons]
     if: needs.release.outputs.new_release_published == 'true'
     steps:
       - name: Checkout repository

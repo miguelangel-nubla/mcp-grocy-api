@@ -1,5 +1,5 @@
 name: MCP Grocy API
-version: "1.3.4-dev.1"
+version: "1.3.11"
 slug: mcp_grocy_api
 description: Home Assistant addon for MCP server that communicates with Grocy REST API.
 arch:
@@ -10,13 +10,13 @@ boot: auto
 init: false
 panel_icon: mdi:cart
 options:
-  grocy_base_url: https://your-grocy-instance.com/api
-  grocy_apikey_value: your_grocy_api_key_here
-  grocy_enable_ssl_verify: true
+  grocy_base_url: https://your-grocy-instance.com
+  grocy_api_key: your_grocy_api_key_here
+  enable_ssl_verify: true
   rest_response_size_limit: 10000
 schema:
   grocy_base_url: url
-  grocy_apikey: password
-  grocy_enable_ssl_verify: bool?
+  grocy_api_key: password
+  enable_ssl_verify: bool?
   rest_response_size_limit: int(1000,)?
 image: "ghcr.io/saya6k/hassio-addons/{arch}-addon-mcp-grocy-api" # Version will be appended by build
