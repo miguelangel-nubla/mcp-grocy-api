@@ -5,7 +5,6 @@
 [![License](https://img.shields.io/github/license/saya6k/mcp-grocy-api)](LICENSE)
 [![Configuration Status](https://github.com/saya6k/mcp-grocy-api/actions/workflows/validate-config.yml/badge.svg)](https://github.com/saya6k/mcp-grocy-api/actions/workflows/validate-config.yml)
 [![CI/CD Pipeline](https://github.com/saya6k/mcp-grocy-api/actions/workflows/pipeline.yml/badge.svg)](https://github.com/saya6k/mcp-grocy-api/actions/workflows/pipeline.yml)
-[![Buy Me a Coffee](https://img.shields.io/badge/Buy%20Me%20a%20Coffee-support-yellow.svg)](https://www.buymeacoffee.com/my7nmfcm92k)
 
 This project is a specialized fork of [mcp-rest-api](https://github.com/dkmaker/mcp-rest-api), refactored to work specifically with Grocy's API.
 
@@ -17,8 +16,7 @@ This project is a specialized fork of [mcp-rest-api](https://github.com/dkmaker/
 git clone https://github.com/saya6k/mcp-grocy-api.git
 cd mcp-grocy-api
 npm install
-npm audit fix
-npm build
+npm run build
 ```
 
 ### Docker
@@ -37,7 +35,7 @@ To use the API, you need to provide the Grocy API URL and API key:
 
 ```bash
 # Start the server with environment variables
-GROCY_API_URL=http://your-grocy-instance GROCY_API_KEY=your_api_key npx mcp-grocy-api
+GROCY_BASE_URL=http://your-grocy-instance GROCY_APIKEY_VALUE=your_api_key npx mcp-grocy-api
 ```
 
 Or to start in development mode:
@@ -49,8 +47,8 @@ npx mcp-grocy-api --mock
 
 ### Environment Variables
 
-- `GROCY_API_URL`: Your Grocy API URL
-- `GROCY_API_KEY`: Your Grocy API key
+- `GROCY_BASE_URL`: Your Grocy API URL
+- `GROCY_APIKEY_VALUE`: Your Grocy API key
 - `PORT`: Port to run the server on (default: 8080)
 - `LOG_LEVEL`: Log level (default: info)
 
