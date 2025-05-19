@@ -369,6 +369,29 @@ jobs:
     # Always update the submodule for main branch pushes - no version condition
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     steps:
+      # Get the current project for updating config.yaml
+      - name: Checkout current repository
+        uses: actions/checkout@v4
+        with:
+          path: current-repo
+          
+      # Update version in config.yaml to match the release
+      - name: Update version in config.yaml
+        if: needs.release.outputs.new_release_published == 'true'
+        working-directory: current-repo
+        run: |
+          VERSION="${{ needs.release.outputs.new_release_version }}"
+          echo "Updating config.yaml to version $VERSION"
+          sed -i "s/version: \"[0-9]*\.[0-9]*\.[0-9]*\"/version: \"$VERSION\"/" config.yaml
+          cat config.yaml | grep version
+          
+          # Commit the change to the repository
+          git config --local user.email "github-actions[bot]@users.noreply.github.com"
+          git config --local user.name "github-actions[bot]"
+          git add config.yaml
+          git commit -m "chore(release): update config.yaml to version $VERSION [skip ci]"
+          git push
+      
       - name: Checkout hassio-addons repository
         uses: actions/checkout@v4
         with:
