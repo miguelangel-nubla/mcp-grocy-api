@@ -3,8 +3,12 @@ name: Publish Docker Image to GHCR
 
 on:
   release:
-    types: [published] # Trigger only when a new release is published
+    types: [published] # Trigger when a new release is published
   workflow_dispatch: # Allows manual triggering
+  workflow_run:
+    workflows: ["CI/CD Pipeline"]
+    branches: [main]
+    types: [completed]
 
 permissions:
   contents: read # Needed to check out code
@@ -14,10 +18,15 @@ jobs:
   build-and-publish:
     name: Build and Publish Docker Image
     runs-on: ubuntu-latest
+    # Don't run if triggered by workflow_run but the pipeline failed
+    if: github.event_name != 'workflow_run' || github.event.workflow_run.conclusion == 'success'
 
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          fetch-tags: true
 
       - name: Get release version
         id: get_version
