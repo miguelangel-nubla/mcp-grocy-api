@@ -1,3 +1,10 @@
+## [1.3.11](https://github.com/saya6k/mcp-grocy-api/compare/v1.3.10...v1.3.11) (2025-05-19)
+
+
+### Bug Fixes
+
+* complete rework of ci ([5b4643f](https://github.com/saya6k/mcp-grocy-api/commit/5b4643f53409599ba9b9f42553762ebb477e0381))
+
 ## [1.3.10-dev.1](https://github.com/saya6k/mcp-grocy-api/compare/v1.3.9...v1.3.10-dev.1) (2025-05-19)
 
 
