@@ -21,6 +21,18 @@ This document describes all available configuration options for the Grocy API MC
 - Values: Set to `false` to disable SSL verification (e.g., for self-signed certificates).
 - Usage: Disable when testing Grocy instances with self-signed certificates in development environments.
 
+### ENABLE_HTTP_SERVER (Optional)
+- Description: Enable Streamable HTTP server in MCP-Grocy-API
+- Default: `false`
+- Values: Set to `true` to enable Streamable http server.
+- Usage: Enable when to usehttp server 
+
+### HTTP_SERVER_PORT (Optional)
+- Description: The port for the Streamable HTTP/SSE server.
+- Default: `8080`
+- Example: `HTTP_SERVER_PORT=8080`
+- Usage: Set this to change the port the HTTP/SSE server listens on. Must match the port exposed in Docker or your deployment config.
+
 ## Authentication Configuration
 
 The tool supports API Key authentication for Grocy.
@@ -39,17 +51,22 @@ The tool supports API Key authentication for Grocy.
 The MCP Grocy API server now supports:
 
 - **stdio** (default, Context7 MCP protocol)
-- **HTTP** (streamable, Context7-compatible, opt-in)
+- **HTTP** (streamable, Context7-compatible, opt-in, port configurable via `HTTP_SERVER_PORT`)
 - **SSE** (Server-Sent Events, for backward compatibility)
 
 To enable HTTP/SSE transport, set:
 
 ```
 ENABLE_HTTP_SERVER=true
-HTTP_SERVER_PORT=8080 # (optional)
+HTTP_SERVER_PORT=8080 # (optional, default: 8080)
 ```
 
-See `src/server/http-server.ts` for implementation details.
+The HTTP server will listen on the port specified by `HTTP_SERVER_PORT`. Make sure to expose this port in your Dockerfile or deployment configuration.
+
+- POST requests to `/mcp` for streamable HTTP (NDJSON or JSON)
+- GET requests to `/mcp/sse` for SSE (Server-Sent Events)
+
+All transports use the same MCP protocol and core logic.
 
 ## Configuration Examples
 
