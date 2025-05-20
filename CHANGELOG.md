@@ -1,3 +1,11 @@
+## [1.4.7](https://github.com/saya6k/mcp-grocy-api/compare/v1.4.6...v1.4.7) (2025-05-20)
+
+
+### Bug Fixes
+
+* Dockerfile dependency fix ([2dddd96](https://github.com/saya6k/mcp-grocy-api/commit/2dddd96af052ee450dbbaaebf9c314a29ed257f4))
+* package dependency fix ([bf19c79](https://github.com/saya6k/mcp-grocy-api/commit/bf19c79a811fa8f8fe7f07c685898262d9c88bae))
+
 ## [1.4.6](https://github.com/saya6k/mcp-grocy-api/compare/v1.4.5...v1.4.6) (2025-05-20)
 
 
