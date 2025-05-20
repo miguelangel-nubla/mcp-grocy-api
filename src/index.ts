@@ -7,6 +7,7 @@ import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js'
 import {
   CallToolRequestSchema,
   ErrorCode,
+  InitializeRequestSchema,
   ListToolsRequestSchema,
   ListResourcesRequestSchema,
   ReadResourceRequestSchema,
@@ -15,6 +16,7 @@ import {
 import axios, { AxiosInstance, AxiosRequestConfig, Method } from 'axios';
 import { VERSION, PACKAGE_NAME as SERVER_NAME } from './version.js';
 import { startHttpServer } from './server/http-server.js';
+import { z } from 'zod';
 
 // Debug output to help identify version and naming issues
 console.error(`Starting ${SERVER_NAME} server version ${VERSION}`);
@@ -209,6 +211,43 @@ class GrocyApiServer {
     process.on('SIGINT', async () => {
       await this.server.close();
       process.exit(0);
+    });
+
+    this.server.setRequestHandler(InitializeRequestSchema, async (request) => {
+      console.error('[DEBUG] Initialize handler called with request:', JSON.stringify(request));
+      return {
+        capabilities: {
+          tools: {},
+          resources: {},
+          prompts: {}
+        },
+        serverInfo: {
+          name: SERVER_NAME,
+          version: VERSION
+        }
+      };
+    });
+    
+    // Custom schema for method: 'initialize' (for compatibility with clients that use this method name)
+    const PlainInitializeRequestSchema = z.object({
+      jsonrpc: z.literal('2.0'),
+      id: z.union([z.string(), z.number()]).optional(),
+      method: z.literal('initialize'),
+      params: z.any().optional()
+    });
+    this.server.setRequestHandler(PlainInitializeRequestSchema, async (request) => {
+      console.error('[DEBUG] Plain "initialize" handler called with request:', JSON.stringify(request));
+      return {
+        capabilities: {
+          tools: {},
+          resources: {},
+          prompts: {}
+        },
+        serverInfo: {
+          name: SERVER_NAME,
+          version: VERSION
+        }
+      };
     });
   }
   
@@ -1538,7 +1577,7 @@ class GrocyApiServer {
     };
 
     // 3. Authentication headers (highest priority)
-    // Only API Key authentication is supported
+    // Only API Key authentication is supported now
     if (hasApiKeyAuth()) {
       config.headers = {
         ...config.headers,
