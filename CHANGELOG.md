@@ -1,3 +1,10 @@
+## [1.3.13](https://github.com/saya6k/mcp-grocy-api/compare/v1.3.12...v1.3.13) (2025-05-20)
+
+
+### Bug Fixes
+
+* hass addon option ([747aee0](https://github.com/saya6k/mcp-grocy-api/commit/747aee08a88c42a40f00cd8f84829552586cbb2d))
+
 ## [1.3.12](https://github.com/saya6k/mcp-grocy-api/compare/v1.3.11...v1.3.12) (2025-05-19)
 
 
