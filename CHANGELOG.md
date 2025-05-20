@@ -1,3 +1,10 @@
+## [1.4.1](https://github.com/saya6k/mcp-grocy-api/compare/v1.4.0...v1.4.1) (2025-05-20)
+
+
+### Bug Fixes
+
+* fix typo in Home Assistant Addon ([83e968f](https://github.com/saya6k/mcp-grocy-api/commit/83e968ff4bfcad6c2997f33c524065445e8aee32))
+
 # [1.4.0](https://github.com/saya6k/mcp-grocy-api/compare/v1.3.13...v1.4.0) (2025-05-20)
 
 
