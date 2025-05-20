@@ -1,3 +1,10 @@
+## [1.4.6](https://github.com/saya6k/mcp-grocy-api/compare/v1.4.5...v1.4.6) (2025-05-20)
+
+
+### Bug Fixes
+
+* always include protocolVersion in initialize response for MCP compatibility ([efbc78e](https://github.com/saya6k/mcp-grocy-api/commit/efbc78ec45fa309b29f40d987bc4dd866365206e))
+
 ## [1.4.5](https://github.com/saya6k/mcp-grocy-api/compare/v1.4.4...v1.4.5) (2025-05-20)
 
 
