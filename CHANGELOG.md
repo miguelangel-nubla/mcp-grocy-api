@@ -1,3 +1,10 @@
+## [1.4.2](https://github.com/saya6k/mcp-grocy-api/compare/v1.4.1...v1.4.2) (2025-05-20)
+
+
+### Bug Fixes
+
+* fix Home Assistant addon config.yaml ([e4123f4](https://github.com/saya6k/mcp-grocy-api/commit/e4123f4838fb5ebc3848981059259e809db1c26c))
+
 ## [1.4.1](https://github.com/saya6k/mcp-grocy-api/compare/v1.4.0...v1.4.1) (2025-05-20)
 
 
