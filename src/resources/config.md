@@ -34,6 +34,23 @@ The tool supports API Key authentication for Grocy.
   ```
 - Usage: When `GROCY_APIKEY_VALUE` is set, requests will include the `GROCY-API-KEY` header with its value.
 
+## HTTP/SSE Transport
+
+The MCP Grocy API server now supports:
+
+- **stdio** (default, Context7 MCP protocol)
+- **HTTP** (streamable, Context7-compatible, opt-in)
+- **SSE** (Server-Sent Events, for backward compatibility)
+
+To enable HTTP/SSE transport, set:
+
+```
+ENABLE_HTTP_SERVER=true
+HTTP_SERVER_PORT=8080 # (optional)
+```
+
+See `src/server/http-server.ts` for implementation details.
+
 ## Configuration Examples
 
 ### Local Development with Grocy
