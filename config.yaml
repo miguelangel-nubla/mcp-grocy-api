@@ -14,9 +14,17 @@ options:
   grocy_api_key: your_grocy_api_key_here
   enable_ssl_verify: true
   rest_response_size_limit: 10000
+  enable_http_server: true
+  http_server_port: 8080
 schema:
   grocy_base_url: url
   grocy_api_key: password
   enable_ssl_verify: bool?
   rest_response_size_limit: int(1000,)?
+  enable_http_server: bool
+  http_server_port: int(1,65535)
+ports:
+  - 8080/tcp: 8080
+ports_description:
+  - 8080/TCP: Default HTTP port
 image: "ghcr.io/saya6k/hassio-addons/{arch}-addon-mcp-grocy-api" # Version will be appended by build

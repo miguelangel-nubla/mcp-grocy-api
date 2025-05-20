@@ -28,5 +28,12 @@ fi
 # Perform any necessary cleanup here
 bashio::log.info "Cleaning up resources..."
 
+# Graceful shutdown: attempt to stop HTTP server if running
+if [ -n "${HTTP_SERVER_PORT}" ]; then
+  bashio::log.info "Attempting graceful shutdown of HTTP server on port ${HTTP_SERVER_PORT}..."
+  # Optionally, send SIGTERM to any process listening on the port (if needed)
+  # fuser -k ${HTTP_SERVER_PORT}/tcp || true
+fi
+
 # Return the original exit code
 exit ${EXIT_CODE}

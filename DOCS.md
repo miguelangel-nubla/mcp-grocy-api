@@ -43,11 +43,13 @@ response_size_limit: 10000
 - Maximum size of API responses.
 - Default: `10000`
 
+### Option: `enable_http_server` (optional)
+- Set to `false` to disable streamable http and sse protocol server.
+- Default: `true`
+
 ## Communication
 
-This addon communicates with Home Assistant via standard input/output (stdio) and does not expose any ports. It is designed to be used as a backend service without direct network access.
-
-Someday SSE protocol support can arrive.
+This addon communicates with Home Assistant via standard input/output (stdio) or streamable http server using endpoint `/mcp` and SSE protocol using endpoint `/mcp/sse`
 
 ## Support
 

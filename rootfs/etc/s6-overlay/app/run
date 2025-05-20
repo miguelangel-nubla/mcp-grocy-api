@@ -10,13 +10,15 @@ export GROCY_BASE_URL=$(bashio::config 'grocy_base_url')
 export GROCY_APIKEY_VALUE=$(bashio::config 'grocy_api_key')
 export GROCY_ENABLE_SSL_VERIFY=$(bashio::config 'enable_ssl_verify')
 export REST_RESPONSE_SIZE_LIMIT=$(bashio::config 'response_size_limit')
-# export PORT=$(bashio::config 'port')
+export ENABLE_HTTP_SERVER=$(bashio::config 'enable_http_server')
+export HTTP_SERVER_PORT=$(bashio::config 'http_server_port')
 
 bashio::log.info "Starting Grocy API Server..."
-# bashio::log.info "Port: ${PORT}"
 bashio::log.info "Grocy URL: ${GROCY_BASE_URL}"
 bashio::log.info "SSL Verification: ${GROCY_ENABLE_SSL_VERIFY}"
 bashio::log.info "Response Size Limit: ${REST_RESPONSE_SIZE_LIMIT}"
+bashio::log.info "Streamable HTTP server: ${ENABLE_HTTP_SERVER}"
+bashio::log.info "HTTP Server Port: ${HTTP_SERVER_PORT}"
 
 # --- Define application paths ---
 # APP_BASE_DIR is the working directory set in Dockerfile, and where app files are copied.
