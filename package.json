@@ -39,8 +39,9 @@
     "debug-version-increment": "node scripts/debug-version-increment.js"
   },
   "dependencies": {
-    "@modelcontextprotocol/sdk": "^1.11.3",
+    "@modelcontextprotocol/sdk": "^1.11.4",
     "axios": "^1.6.7",
+    "cors": "^2.8.5",
     "dotenv": "^16.5.0",
     "esbuild": "0.25.4",
     "express": "^5.1.0",
@@ -55,6 +56,7 @@
     "@semantic-release/changelog": "^6.0.3",
     "@semantic-release/exec": "^6.0.3",
     "@semantic-release/git": "^10.0.1",
+    "@types/cors": "^2.8.18",
     "@types/express": "^5.0.2",
     "@types/jest": "^29.5.0",
     "@types/node": "^20.11.20",
