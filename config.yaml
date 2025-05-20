@@ -1,5 +1,5 @@
 name: MCP Grocy API
-version: "1.4.3"
+version: "1.4.4"
 slug: mcp_grocy_api
 description: Home Assistant addon for MCP server that communicates with Grocy REST API.
 arch:

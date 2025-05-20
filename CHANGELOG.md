@@ -1,3 +1,10 @@
+## [1.4.4](https://github.com/saya6k/mcp-grocy-api/compare/v1.4.3...v1.4.4) (2025-05-20)
+
+
+### Bug Fixes
+
+* config.yaml syntax error ([c1fab41](https://github.com/saya6k/mcp-grocy-api/commit/c1fab41dfd57c2506ebf279ba9c7e00bdf15b939))
+
 ## [1.4.3](https://github.com/saya6k/mcp-grocy-api/compare/v1.4.2...v1.4.3) (2025-05-20)
 
 
