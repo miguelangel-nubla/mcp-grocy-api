@@ -1,3 +1,11 @@
+# [1.4.0](https://github.com/saya6k/mcp-grocy-api/compare/v1.3.13...v1.4.0) (2025-05-20)
+
+
+### Features
+
+* support streamable http and sse ([8e73976](https://github.com/saya6k/mcp-grocy-api/commit/8e739766b4a8fa2248d059367132d413ff22b7a3))
+* support streamable http server in HA addon and Docker container ([0655b7c](https://github.com/saya6k/mcp-grocy-api/commit/0655b7c1b597d4c15fc1cfc0c44133a93f6d6b6e))
+
 ## [1.3.13](https://github.com/saya6k/mcp-grocy-api/compare/v1.3.12...v1.3.13) (2025-05-20)
 
 
