@@ -17,6 +17,7 @@ export function startHttpServer(mcpServer: Server, port: number = 8080) {
 
   // Streamable HTTP endpoint (Context7 modern)
   app.post('/mcp', async (req, res) => {
+    console.error('[DEBUG] Incoming /mcp request:', JSON.stringify(req.body), 'Session ID:', req.headers['mcp-session-id']);
     const sessionId = req.headers['mcp-session-id'] as string | undefined;
     let transport: StreamableHTTPServerTransport;
 
