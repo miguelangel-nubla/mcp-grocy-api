@@ -1,3 +1,10 @@
+## [1.4.5](https://github.com/saya6k/mcp-grocy-api/compare/v1.4.4...v1.4.5) (2025-05-20)
+
+
+### Bug Fixes
+
+* http server not initializing ([7a58107](https://github.com/saya6k/mcp-grocy-api/commit/7a5810779d6cb48cfd4ef121e3893c8319c7dd09))
+
 ## [1.4.4](https://github.com/saya6k/mcp-grocy-api/compare/v1.4.3...v1.4.4) (2025-05-20)
 
 
