@@ -159,103 +159,6 @@ jobs:
           echo "New release published: ${{ steps.semantic-release.outputs.new_release_published }}"
           echo "New release version: ${{ steps.semantic-release.outputs.new_release_version }}"
   
-  publish-docker:
-    name: Publish Docker Image to GHCR
-    runs-on: ubuntu-latest
-    needs: [release]
-    if: needs.release.outputs.new_release_published == 'true'
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
-        with:
-          ref: main  # Ensure we're using the code from main branch after release
-
-      # Check if this version already exists in the registry
-      - name: Log in to GitHub Container Registry
-        uses: docker/login-action@v3
-        with:
-          registry: ghcr.io
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
-      
-      - name: Check if image already exists
-        id: check_image
-        run: |
-          VERSION="${{ needs.release.outputs.new_release_version }}"
-          echo "Checking if Docker image for version $VERSION already exists..."
-          
-          # Try to pull the image manifest - will fail if it doesn't exist
-          if docker buildx imagetools inspect ghcr.io/${{ github.repository }}:$VERSION &>/dev/null; then
-            echo "Image already exists in registry. Skipping build."
-            echo "image_exists=true" >> $GITHUB_OUTPUT
-          else
-            echo "Image does not exist yet. Proceeding with build."
-            echo "image_exists=false" >> $GITHUB_OUTPUT
-          fi
-
-      - name: Set up QEMU
-        if: steps.check_image.outputs.image_exists != 'true'
-        uses: docker/setup-qemu-action@v3
-      
-      - name: Set up Docker Buildx
-        if: steps.check_image.outputs.image_exists != 'true'
-        uses: docker/setup-buildx-action@v3
-      
-      # Build AMD64 image
-      - name: Build and push AMD64 image
-        if: steps.check_image.outputs.image_exists != 'true'
-        uses: docker/build-push-action@v5
-        with:
-          context: .
-          platforms: linux/amd64
-          push: true
-          tags: |
-            ghcr.io/${{ github.repository }}:${{ needs.release.outputs.new_release_version }}-amd64
-            ghcr.io/${{ github.repository }}:latest-amd64
-          build-args: |
-            NODE_VERSION=20
-          cache-from: type=registry,ref=ghcr.io/${{ github.repository }}:latest-amd64
-          cache-to: type=inline
-      
-      # Build ARM64 image with memory settings for ARM builds
-      - name: Build and push ARM64 image
-        if: steps.check_image.outputs.image_exists != 'true'
-        uses: docker/build-push-action@v5
-        with:
-          context: .
-          platforms: linux/arm64
-          push: true
-          tags: |
-            ghcr.io/${{ github.repository }}:${{ needs.release.outputs.new_release_version }}-arm64
-            ghcr.io/${{ github.repository }}:latest-arm64
-          build-args: |
-            NODE_VERSION=20
-            NODE_OPTIONS=--max_old_space_size=4096
-          cache-from: type=registry,ref=ghcr.io/${{ github.repository }}:latest-arm64
-          cache-to: type=inline
-      
-      # Create multi-architecture manifest
-      - name: Create and push manifest
-        if: steps.check_image.outputs.image_exists != 'true'
-        run: |
-          docker buildx imagetools create -t ghcr.io/${{ github.repository }}:${{ needs.release.outputs.new_release_version }} \
-            ghcr.io/${{ github.repository }}:${{ needs.release.outputs.new_release_version }}-amd64 \
-            ghcr.io/${{ github.repository }}:${{ needs.release.outputs.new_release_version }}-arm64
-          
-          docker buildx imagetools create -t ghcr.io/${{ github.repository }}:latest \
-            ghcr.io/${{ github.repository }}:latest-amd64 \
-            ghcr.io/${{ github.repository }}:latest-arm64
-      
-      # Summary
-      - name: Docker Publish Summary
-        run: |
-          VERSION="${{ needs.release.outputs.new_release_version }}"
-          if [[ "${{ steps.check_image.outputs.image_exists }}" == "true" ]]; then
-            echo "Image for version $VERSION already exists in the registry. No new image was built."
-          else
-            echo "Successfully built and published Docker image for version $VERSION."
-          fi
-
   publish-npm:
     name: Publish Package to NPM
     runs-on: ubuntu-latest
@@ -362,36 +265,110 @@ jobs:
             echo "Successfully published NPM package version $VERSION."
           fi
 
-  publish-hassio-addons:
-    name: Publish to Hass.io Addons
+
+  publish-docker:
+    name: Publish Docker Image to GHCR
     runs-on: ubuntu-latest
-    needs: [release]
+    needs: [publish-npm]
+    if: needs.release.outputs.new_release_published == 'true'
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          ref: main  # Ensure we're using the code from main branch after release
+
+      # Check if this version already exists in the registry
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      
+      - name: Check if image already exists
+        id: check_image
+        run: |
+          VERSION="${{ needs.release.outputs.new_release_version }}"
+          echo "Checking if Docker image for version $VERSION already exists..."
+          
+          # Try to pull the image manifest - will fail if it doesn't exist
+          if docker buildx imagetools inspect ghcr.io/${{ github.repository }}:$VERSION &>/dev/null; then
+            echo "Image already exists in registry. Skipping build."
+            echo "image_exists=true" >> $GITHUB_OUTPUT
+          else
+            echo "Image does not exist yet. Proceeding with build."
+            echo "image_exists=false" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Set up QEMU
+        if: steps.check_image.outputs.image_exists != 'true'
+        uses: docker/setup-qemu-action@v3
+      
+      - name: Set up Docker Buildx
+        if: steps.check_image.outputs.image_exists != 'true'
+        uses: docker/setup-buildx-action@v3
+      
+      # Build AMD64 image
+      - name: Build and push AMD64 image
+        if: steps.check_image.outputs.image_exists != 'true'
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          platforms: linux/amd64
+          push: true
+          tags: |
+            ghcr.io/${{ github.repository }}:${{ needs.release.outputs.new_release_version }}-amd64
+            ghcr.io/${{ github.repository }}:latest-amd64
+          build-args: |
+            NODE_VERSION=20
+          cache-from: type=registry,ref=ghcr.io/${{ github.repository }}:latest-amd64
+          cache-to: type=inline
+      
+      # Build ARM64 image with memory settings for ARM builds
+      - name: Build and push ARM64 image
+        if: steps.check_image.outputs.image_exists != 'true'
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          platforms: linux/arm64
+          push: true
+          tags: |
+            ghcr.io/${{ github.repository }}:${{ needs.release.outputs.new_release_version }}-arm64
+            ghcr.io/${{ github.repository }}:latest-arm64
+          build-args: |
+            NODE_VERSION=20
+            NODE_OPTIONS=--max_old_space_size=4096
+          cache-from: type=registry,ref=ghcr.io/${{ github.repository }}:latest-arm64
+          cache-to: type=inline
+      
+      # Create multi-architecture manifest
+      - name: Create and push manifest
+        if: steps.check_image.outputs.image_exists != 'true'
+        run: |
+          docker buildx imagetools create -t ghcr.io/${{ github.repository }}:${{ needs.release.outputs.new_release_version }} \
+            ghcr.io/${{ github.repository }}:${{ needs.release.outputs.new_release_version }}-amd64 \
+            ghcr.io/${{ github.repository }}:${{ needs.release.outputs.new_release_version }}-arm64
+          
+          docker buildx imagetools create -t ghcr.io/${{ github.repository }}:latest \
+            ghcr.io/${{ github.repository }}:latest-amd64 \
+            ghcr.io/${{ github.repository }}:latest-arm64
+      
+      # Summary
+      - name: Docker Publish Summary
+        run: |
+          VERSION="${{ needs.release.outputs.new_release_version }}"
+          if [[ "${{ steps.check_image.outputs.image_exists }}" == "true" ]]; then
+            echo "Image for version $VERSION already exists in the registry. No new image was built."
+          else
+            echo "Successfully built and published Docker image for version $VERSION."
+          fi
+
+  publish-hassio-addons:
+    runs-on: ubuntu-latest
+    needs: [publish-npm]
     # Always update the submodule for main branch pushes - no version condition
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     steps:
-      # Get the current project for updating config.yaml
-      - name: Checkout current repository
-        uses: actions/checkout@v4
-        with:
-          path: current-repo
-          
-      # Update version in config.yaml to match the release
-      - name: Update version in config.yaml
-        if: needs.release.outputs.new_release_published == 'true'
-        working-directory: current-repo
-        run: |
-          VERSION="${{ needs.release.outputs.new_release_version }}"
-          echo "Updating config.yaml to version $VERSION"
-          sed -i "s/version: \"[0-9]*\.[0-9]*\.[0-9]*\"/version: \"$VERSION\"/" config.yaml
-          cat config.yaml | grep version
-          
-          # Commit the change to the repository
-          git config --local user.email "github-actions[bot]@users.noreply.github.com"
-          git config --local user.name "github-actions[bot]"
-          git add config.yaml
-          git commit -m "chore(release): update config.yaml to version $VERSION [skip ci]"
-          git push
-      
       - name: Checkout hassio-addons repository
         uses: actions/checkout@v4
         with:
@@ -471,41 +448,3 @@ jobs:
           git add .gitmodules mcp-grocy-api
           git commit -m "chore: add mcp-grocy-api submodule"
           git push
-
-  sync-dev:
-    name: Sync Dev Branch with Main
-    runs-on: ubuntu-latest
-    needs: [release, publish-docker, publish-npm, publish-hassio-addons]
-    if: needs.release.outputs.new_release_published == 'true'
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
-        with:
-          fetch-depth: 0  # Fetch all history
-          ref: main  # Start with main branch
-
-      - name: Setup Git
-        run: |
-          git config --global user.name 'github-actions[bot]'
-          git config --global user.email 'github-actions[bot]@users.noreply.github.com'
-          
-      - name: Sync dev branch with main
-        run: |
-          # Fetch all branches
-          git fetch origin
-          
-          # Check if dev branch exists
-          if git ls-remote --heads origin dev | grep -q 'dev'; then
-            # Create tracking branch for dev
-            git checkout --track origin/dev || git checkout dev
-            
-            # Merge main into dev
-            git merge origin/main -m "chore(sync): merge main into dev after release ${{ needs.release.outputs.new_release_version }} [skip ci]"
-            
-            # Push changes to dev
-            git push origin dev
-            
-            echo "Successfully synchronized dev branch with main"
-          else
-            echo "Dev branch does not exist. Skipping synchronization."
-          fi

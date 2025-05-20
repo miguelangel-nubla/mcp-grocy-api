@@ -6,7 +6,7 @@
 # ==============================================================================
 
 # --- Read configuration from config.yaml ---
-export GROCY_BASE_URL=$(bashio::config 'grocy_url')
+export GROCY_BASE_URL=$(bashio::config 'grocy_base_url')
 export GROCY_APIKEY_VALUE=$(bashio::config 'grocy_api_key')
 export GROCY_ENABLE_SSL_VERIFY=$(bashio::config 'enable_ssl_verify')
 export REST_RESPONSE_SIZE_LIMIT=$(bashio::config 'response_size_limit')
