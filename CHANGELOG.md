@@ -1,3 +1,10 @@
+## [1.4.3](https://github.com/saya6k/mcp-grocy-api/compare/v1.4.2...v1.4.3) (2025-05-20)
+
+
+### Bug Fixes
+
+* fix Home Assistant add-on config port to dictionary ([405cd27](https://github.com/saya6k/mcp-grocy-api/commit/405cd27228debf51ad2d2a6e0140c9f936783c4e))
+
 ## [1.4.2](https://github.com/saya6k/mcp-grocy-api/compare/v1.4.1...v1.4.2) (2025-05-20)
 
 
