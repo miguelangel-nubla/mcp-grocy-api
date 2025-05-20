@@ -22,9 +22,9 @@ schema:
   enable_ssl_verify: bool?
   rest_response_size_limit: int(1000,)?
   enable_http_server: bool
-  http_server_port: int(1,65535)
+  http_server_port: port
 ports:
   - 8080/tcp: 8080
 ports_description:
-  - 8080/TCP: Default HTTP port
+  - 8080/tcp: Default HTTP port
 image: "ghcr.io/saya6k/hassio-addons/{arch}-addon-mcp-grocy-api" # Version will be appended by build
