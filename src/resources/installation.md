@@ -95,3 +95,23 @@ Then run the container with tini:
 ```bash
 docker run -p mcp-grocy-api tini -- node build/index.js
 ```
+
+## HTTP/SSE Transport
+
+The MCP Grocy API server supports the following transports:
+
+- **stdio** (default, Context7 MCP protocol)
+- **HTTP** (streamable, Context7-compatible, opt-in)
+- **SSE** (Server-Sent Events, for backward compatibility)
+
+To enable HTTP/SSE transport, set the following environment variable:
+
+```bash
+ENABLE_HTTP_SERVER=true
+HTTP_SERVER_PORT=8080 # (optional, default: 8080)
+```
+
+- POST requests to `/mcp` for streamable HTTP (NDJSON or JSON)
+- GET requests to `/mcp/sse` for SSE (Server-Sent Events)
+
+All transports use the same MCP protocol and core logic.

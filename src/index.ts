@@ -14,6 +14,7 @@ import {
 } from '@modelcontextprotocol/sdk/types.js';
 import axios, { AxiosInstance, AxiosRequestConfig, Method } from 'axios';
 import { VERSION, PACKAGE_NAME as SERVER_NAME } from './version.js';
+import { startHttpServer } from './server/http-server.js';
 
 // Debug output to help identify version and naming issues
 console.error(`Starting ${SERVER_NAME} server version ${VERSION}`);
@@ -1856,6 +1857,13 @@ class GrocyApiServer {
     const transport = new StdioServerTransport();
     await this.server.connect(transport);
     console.error('Grocy API MCP server running on stdio');
+
+    // Start HTTP/SSE transport for backward compatibility
+    if (process.env.ENABLE_HTTP_SERVER === 'true') {
+      const port = process.env.HTTP_SERVER_PORT ? parseInt(process.env.HTTP_SERVER_PORT, 10) : 8080;
+      startHttpServer(this.server, port);
+      console.error(`Grocy API MCP server also running on HTTP/SSE port ${port}`);
+    }
   }
 }
 

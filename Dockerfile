@@ -60,10 +60,13 @@ ENV GROCY_BASE_URL=""
 ENV GROCY_APIKEY_VALUE=""
 ENV GROCY_ENABLE_SSL_VERIFY="true"
 ENV REST_RESPONSE_SIZE_LIMIT="10mb"
+ENV ENABLE_HTTP_SERVER="false"
+ENV HTTP_SERVER_PORT=8080
 
 # --- Volumes ---
 
 # --- Expose Port ---
+EXPOSE 8080
 
 # --- Entrypoint & Command ---
 # For Home Assistant addon builds, the entrypoint is /init (from S6-Overlay in the base image).
