@@ -237,7 +237,13 @@ class GrocyApiServer {
     });
     this.server.setRequestHandler(PlainInitializeRequestSchema, async (request) => {
       console.error('[DEBUG] Plain "initialize" handler called with request:', JSON.stringify(request));
+      // Extract protocolVersion from request.params or fallback to a default
+      let protocolVersion = '2024-11-05';
+      if (request.params && typeof request.params.protocolVersion === 'string') {
+        protocolVersion = request.params.protocolVersion;
+      }
       return {
+        protocolVersion, // Always include protocolVersion as string
         capabilities: {
           tools: {},
           resources: {},
