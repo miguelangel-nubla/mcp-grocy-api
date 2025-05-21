@@ -1,6 +1,6 @@
 # MCP Grocy API - Home Assistant Addon
 
-This addon allows you to run MCP server that communicates with Grocy API in your Home Assistant instance, and provides an stdio protocol connection for connecting Grocy inventory management to other systems.
+This addon allows you to run MCP server that communicates with Grocy API in your Home Assistant instance, and provides an stdio, streamable http and sse protocol connection for connecting Grocy inventory management to other systems.
 
 ## Installation
 

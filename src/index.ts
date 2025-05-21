@@ -1911,8 +1911,7 @@ class GrocyApiServer {
     console.error('[CONFIG] HTTP_SERVER_PORT:', process.env.HTTP_SERVER_PORT);
     
     // Accept various formats of "true" values for better compatibility
-    const enableHttpServer = ['true', 'yes', '1', 'on', 'enabled', 't', 'y']
-      .includes(String(process.env.ENABLE_HTTP_SERVER || '').toLowerCase());
+    const enableHttpServer = ['true', 'yes', '1', 'on', 'enabled'].includes(String(process.env.ENABLE_HTTP_SERVER || '').toLowerCase());
     
     console.error(`[CONFIG] HTTP Server will be ${enableHttpServer ? 'enabled' : 'disabled'}`);
     
@@ -1920,33 +1919,15 @@ class GrocyApiServer {
       try {
         // Parse port or use default
         const portStr = process.env.HTTP_SERVER_PORT;
-        let port = 8080; // Default port
+        const port = portStr ? parseInt(String(portStr), 10) : 8080;
         
-        if (portStr) {
-          const parsedPort = parseInt(String(portStr), 10);
-          if (!isNaN(parsedPort) && parsedPort > 0 && parsedPort < 65536) {
-            port = parsedPort;
-          } else {
-            console.error(`[ERROR] Invalid HTTP port value: ${portStr}, using default 8080`);
-          }
+        if (isNaN(port)) {
+          console.error(`[ERROR] Invalid HTTP port value: ${portStr}, using default 8080`);
         }
         
         // Start HTTP server
         console.error(`[CONFIG] Starting HTTP/SSE server on port ${port}`);
-        const httpServer = startHttpServer(this.server, port);
-        
-        // Log successful startup and cleanup on process exit
-        if (httpServer) {
-          process.on('SIGINT', () => {
-            console.error('[CONFIG] Received SIGINT signal, shutting down HTTP server');
-            httpServer.close();
-          });
-          
-          process.on('SIGTERM', () => {
-            console.error('[CONFIG] Received SIGTERM signal, shutting down HTTP server');
-            httpServer.close();
-          });
-        }
+        startHttpServer(this.server, port);
       } catch (error) {
         console.error(`[ERROR] Failed to start HTTP/SSE server:`, error);
       }
