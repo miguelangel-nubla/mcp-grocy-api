@@ -105,10 +105,12 @@ jobs:
         shell: bash
 
       - name: Release
+        id: semantic-release # Add id here
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
-        run: npx semantic-release --debug
+        run: |
+          npx semantic-release --debug
           
           # Extract version from package.json for subsequent jobs if semantic-release succeeds but doesn't set outputs
           if [ $? -eq 0 ]; then
