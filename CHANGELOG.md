@@ -1,3 +1,17 @@
+## [1.4.11](https://github.com/saya6k/mcp-grocy-api/compare/v1.4.10...v1.4.11) (2025-05-21)
+
+
+### Bug Fixes
+
+* fix submodule path ([bdab0f2](https://github.com/saya6k/mcp-grocy-api/commit/bdab0f2739a57cd301510477e903516ee2be5dcd))
+
+## [1.4.10](https://github.com/saya6k/mcp-grocy-api/compare/v1.4.9...v1.4.10) (2025-05-21)
+
+
+### Bug Fixes
+
+* publishing HA Addon ([cb1de33](https://github.com/saya6k/mcp-grocy-api/commit/cb1de3342c6649f3b48797142c4485b5ff2aba0b))
+
 ## [1.4.9](https://github.com/saya6k/mcp-grocy-api/compare/v1.4.8...v1.4.9) (2025-05-21)
 
 
