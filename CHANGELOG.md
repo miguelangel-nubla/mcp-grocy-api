@@ -1,3 +1,14 @@
+## [1.4.12](https://github.com/saya6k/mcp-grocy-api/compare/v1.4.11...v1.4.12) (2025-05-21)
+
+
+### Bug Fixes
+
+* erase wrong option ([e1f30c1](https://github.com/saya6k/mcp-grocy-api/commit/e1f30c131c33c3dbb132a0f630ee4f8c2cd48160))
+* fix DOCS.md ([1b22531](https://github.com/saya6k/mcp-grocy-api/commit/1b22531cf4b2a3199b26675ddf4822f4c32ab7ff))
+* fix HA addon config options ([d0e7bd5](https://github.com/saya6k/mcp-grocy-api/commit/d0e7bd548d54231e9ffd5c9980bf9b20fdefc5b9))
+* index.ts ([e76780b](https://github.com/saya6k/mcp-grocy-api/commit/e76780b7026199e2ee7b8d045b4a969a910c0f35))
+* rework of ci to publish addon and docker correctly ([b450e4b](https://github.com/saya6k/mcp-grocy-api/commit/b450e4bd7270130c68f7811967b16de2a374c738))
+
 ## [1.4.11](https://github.com/saya6k/mcp-grocy-api/compare/v1.4.10...v1.4.11) (2025-05-21)
 
 
