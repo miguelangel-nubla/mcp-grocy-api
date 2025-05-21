@@ -1,0 +1,130 @@
+name: Publish Hass.io Addon Submodule Update
+
+on:
+  workflow_call:
+    inputs:
+      release_version:
+        required: true
+        type: string
+    secrets:
+      HASSIO_ADDONS_TOKEN:
+        required: true
+
+jobs:
+  publish-hassio-addons:
+    name: Update Submodule in hassio-addons
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout hassio-addons repository
+        uses: actions/checkout@v4
+        with:
+          repository: saya6k/hassio-addons # IMPORTANT: Confirm this is the correct parent repository
+          token: ${{ secrets.HASSIO_ADDONS_TOKEN }} # PAT with write access to the parent repository
+          path: hassio-addons # Checkout to a specific directory
+          ref: main # IMPORTANT: Confirm this is the default branch of hassio-addons
+
+      - name: Setup Git User
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+        working-directory: ./hassio-addons
+
+      - name: Update mcp-grocy-api submodule
+        env:
+          RELEASE_TAG: ${{ inputs.release_version }}
+          SUBMODULE_PATH: mcp-grocy-api
+          CURRENT_REPO_URL: https://github.com/${{ github.repository }}.git
+        run: |
+          set -e # Exit immediately if a command exits with a non-zero status.
+          echo "Attempting to update submodule \'$SUBMODULE_PATH\' to tag: $RELEASE_TAG"
+
+          if [ -z "$RELEASE_TAG" ]; then
+            echo "Error: RELEASE_TAG is empty. Cannot update submodule."
+            exit 1
+          fi
+
+          if [ -f ".gitmodules" ] && grep -q "path = $SUBMODULE_PATH" .gitmodules; then
+            echo "Submodule \'$SUBMODULE_PATH\' is configured. Initializing and updating..."
+            git submodule update --init --force $SUBMODULE_PATH
+          else
+            echo "Submodule \'$SUBMODULE_PATH\' not configured or path does not exist. Adding it."
+            rm -rf $SUBMODULE_PATH
+            git submodule add --force --name $SUBMODULE_PATH $CURRENT_REPO_URL $SUBMODULE_PATH
+          fi
+
+          cd $SUBMODULE_PATH
+          echo "Inside submodule directory: $(pwd)"
+
+          echo "Fetching tags from origin..."
+          git fetch origin --tags --force
+
+          echo "--- Git Submodule Debug Info ---"
+          echo "Current git status:"
+          git status -sb # Short branch status
+          echo "Local branches:"
+          git branch
+          echo "Last 5 tags (local):"
+          git tag -l --sort=-creatordate | head -n 5
+          echo "--------------------------------"
+
+          echo "Resolving tag \'$RELEASE_TAG\' to a commit..."
+          # Try to resolve the tag to a commit SHA. Handles both annotated and lightweight tags.
+          # Also try with a \'v\' prefix for the tag.
+          TAG_COMMIT=$(git rev-parse --verify "$RELEASE_TAG^{commit}" 2>/dev/null || \
+                       git rev-parse --verify "tags/$RELEASE_TAG^{commit}" 2>/dev/null || \
+                       git rev-parse --verify "$RELEASE_TAG" 2>/dev/null || \
+                       git rev-parse --verify "v$RELEASE_TAG^{commit}" 2>/dev/null || \
+                       git rev-parse --verify "tags/v$RELEASE_TAG^{commit}" 2>/dev/null || \
+                       git rev-parse --verify "v$RELEASE_TAG" 2>/dev/null)
+
+
+          if [ -z "$TAG_COMMIT" ]; then
+            echo "Error: Could not resolve tag \'$RELEASE_TAG\' to a commit in $SUBMODULE_PATH."
+            echo "Listing all available local tags in $SUBMODULE_PATH (git tag -l):"
+            git tag -l | cat # Use cat to ensure it\'s not truncated by log limits
+            echo "Listing remote tags from \'git ls-remote --tags origin\':"
+            git ls-remote --tags origin | cat
+            exit 1
+          fi
+          echo "Resolved tag \'$RELEASE_TAG\' to commit SHA: $TAG_COMMIT"
+
+          echo "Attempting to checkout commit \'$TAG_COMMIT\' (derived from tag \'$RELEASE_TAG\')..."
+          # Use -c advice.detachedHead=false to suppress the detached HEAD advice message.
+          if git -c advice.detachedHead=false checkout "$TAG_COMMIT" --force; then
+            CURRENT_HEAD_COMMIT=$(git rev-parse HEAD)
+            if [ "$CURRENT_HEAD_COMMIT" == "$TAG_COMMIT" ]; then
+              echo "Successfully checked out commit \'$TAG_COMMIT\' (from tag \'$RELEASE_TAG\')."
+            else
+              # This should not happen if \'git checkout $TAG_COMMIT\' (a SHA) succeeds.
+              echo "Error: After checkout, HEAD is at \'$CURRENT_HEAD_COMMIT\', but expected \'$TAG_COMMIT\'."
+              exit 1
+            fi
+          else
+            CHECKOUT_EC=$?
+            echo "Error: \'git checkout \"$TAG_COMMIT\" --force\' failed with exit code $CHECKOUT_EC."
+            echo "This can happen if the commit object $TAG_COMMIT is not available locally, despite the tag being resolved."
+            echo "Verifying commit object existence with \'git cat-file -t $TAG_COMMIT\':"
+            git cat-file -t "$TAG_COMMIT" || echo "cat-file check also failed for $TAG_COMMIT (exit code $?). This means the commit object is likely missing or corrupt."
+            exit $CHECKOUT_EC
+          fi
+
+          cd ..
+          echo "Back in hassio-addons root: $(pwd)"
+
+          git add $SUBMODULE_PATH
+          if [ -f ".gitmodules" ]; then
+            git add .gitmodules
+          fi
+
+          if git diff --staged --quiet; then
+            echo "No changes to commit. Submodule \'$SUBMODULE_PATH\' might already be at tag \'$RELEASE_TAG\'."
+          else
+            echo "Changes detected. Committing and pushing to hassio-addons..."
+            # Use printf for safer multi-line string construction for the commit message, all on one line for the shell
+            COMMIT_MESSAGE=$(printf \'Update %s to %s\\n\\nTriggered by release of %s@%s\\nCommit in %s: %s\' "$SUBMODULE_PATH" "$RELEASE_TAG" "${{ github.repository }}" "$RELEASE_TAG" "${{ github.repository }}" "${{ github.sha }}")
+
+            git commit -m "$COMMIT_MESSAGE"
+            git push
+            echo "Successfully pushed submodule update to hassio-addons."
+          fi
+        working-directory: ./hassio-addons # Ensure all commands run in the checked-out parent repo
