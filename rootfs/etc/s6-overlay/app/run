@@ -4,6 +4,8 @@
 #
 # This script starts the MCP Grocy API Server.
 # ==============================================================================
+set -e # Exit immediately if a command exits with a non-zero status.
+set -x # Print commands and their arguments as they are executed.
 
 # --- Read configuration from config.yaml ---
 export GROCY_BASE_URL=$(bashio::config 'grocy_base_url')
@@ -26,6 +28,27 @@ APP_BASE_DIR="/app"
 
 # --- Navigate to application base directory and start the server ---
 cd "${APP_BASE_DIR}" || exit 1
+
+bashio::log.info "Current directory: $(pwd)"
+bashio::log.info "Listing contents of build directory:"
+ls -la build
+
+bashio::log.info "Checking if build/index.js exists..."
+if [ ! -f "build/index.js" ]; then
+  bashio::log.error "build/index.js not found!"
+  exit 1
+fi
+bashio::log.info "build/index.js found."
+
+# --- Test environment variable visibility for Node.js ---
+bashio::log.info "Testing Node.js environment variable visibility..."
+node -e "console.log('[NODE_TEST] GROCY_BASE_URL: ' + process.env.GROCY_BASE_URL);"
+node -e "console.log('[NODE_TEST] GROCY_APIKEY_VALUE: ' + (process.env.GROCY_APIKEY_VALUE ? 'SET' : 'NOT SET'));"
+node -e "console.log('[NODE_TEST] GROCY_ENABLE_SSL_VERIFY: ' + process.env.GROCY_ENABLE_SSL_VERIFY);"
+node -e "console.log('[NODE_TEST] REST_RESPONSE_SIZE_LIMIT: ' + process.env.REST_RESPONSE_SIZE_LIMIT);"
+node -e "console.log('[NODE_TEST] ENABLE_HTTP_SERVER: ' + process.env.ENABLE_HTTP_SERVER);"
+node -e "console.log('[NODE_TEST] HTTP_SERVER_PORT: ' + process.env.HTTP_SERVER_PORT);"
+bashio::log.info "Finished testing Node.js environment variable visibility."
 
 bashio::log.info "Executing Node.js application: node build/index.js"
 
