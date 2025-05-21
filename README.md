@@ -14,7 +14,7 @@ This project is a specialized fork of [mcp-rest-api](https://github.com/dkmaker/
 ### NPM
 
 ```bash
-git clone https://github.com/saya6k/mcp-grocy-api.git
+git clone -b main https://github.com/saya6k/mcp-grocy-api.git
 cd mcp-grocy-api
 npm install
 npm run build
