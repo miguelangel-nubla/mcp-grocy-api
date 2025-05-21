@@ -1,3 +1,11 @@
+## [1.4.8](https://github.com/saya6k/mcp-grocy-api/compare/v1.4.7...v1.4.8) (2025-05-21)
+
+
+### Bug Fixes
+
+* Fix Home Assistant addon to start server properly ([6b7e4a9](https://github.com/saya6k/mcp-grocy-api/commit/6b7e4a99589af4d9ffc20d25c7ecd31d09abd6d1))
+* refresh package-lock.json ([4466f73](https://github.com/saya6k/mcp-grocy-api/commit/4466f73d3e79c2caededccaa8e68f088ceca2f3c))
+
 ## [1.4.7](https://github.com/saya6k/mcp-grocy-api/compare/v1.4.6...v1.4.7) (2025-05-20)
 
 
