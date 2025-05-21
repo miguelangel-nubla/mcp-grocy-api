@@ -1,0 +1,29 @@
+name: Trigger Hass.io Addon Submodule Update on Release
+
+on:
+  push:
+    tags:
+      - 'v*.*.*' # Trigger on tags like v1.0.0, v1.2.3, etc.
+
+jobs:
+  call_publish_hassio_addon:
+    name: Call Publish Hass.io Addon Workflow
+    runs-on: ubuntu-latest
+    permissions: {} # No specific permissions needed for this job itself, the called workflow handles its own.
+    steps:
+      - name: Get version from tag
+        id: get_version
+        run: |
+          TAG_NAME="${{ github.ref_name }}"
+          # Remove 'v' prefix, as publish-hassio-addon.yml expects the pure version number
+          VERSION_NUMBER="${TAG_NAME#v}"
+          echo "Tag received: $TAG_NAME"
+          echo "Extracted version for submodule update: $VERSION_NUMBER"
+          echo "release_version=$VERSION_NUMBER" >> "$GITHUB_OUTPUT"
+
+      - name: Call Publish Hass.io Addon Workflow
+        uses: ./.github/workflows/publish-hassio-addon.yml
+        with:
+          release_version: ${{ steps.get_version.outputs.release_version }}
+        secrets:
+          HASSIO_ADDONS_TOKEN: ${{ secrets.HASSIO_ADDONS_TOKEN }}
