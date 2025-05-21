@@ -56,7 +56,7 @@ To install using Node.js, you will need to have Node.js and npm (or yarn) instal
 
 Clone the repository:
 ```bash
-git clone https://github.com/saya6k/mcp-grocy-api.git
+git clone -b main https://github.com/saya6k/mcp-grocy-api.git
 cd mcp-grocy-api
 ```
 
