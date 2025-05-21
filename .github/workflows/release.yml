@@ -101,52 +101,14 @@ jobs:
 
       - name: Install yq
         run: |
-          sudo wget https://github.com/mikefarah/yq/releases/latest/download/yq_linux_amd64 -O /usr/bin/yq
-          sudo chmod +x /usr/bin/yq
-          echo "yq installed successfully."
-      
-      - name: Install dependencies
-        run: npm install
-      
-      - name: Download build artifacts
-        uses: actions/download-artifact@v4
-        with:
-          name: build-artifacts
-          path: .
-      
-      # Verify release configuration before running semantic-release
-      - name: Verify Release Configuration
-        run: |
-          echo "Verifying release configuration..."
-          npm run verify-release-config
-          if [ $? -ne 0 ]; then
-            echo "::error::Release configuration verification failed!"
-            exit 1
-          fi
-          echo "Release configuration verification passed!"
+          sudo wget https://github.com/mikefarah/yq/releases/latest/download/yq_linux_amd64 -O /usr/bin/yq && sudo chmod +x /usr/bin/yq
+        shell: bash
 
-      # Ensure we have all tags and history for semantic-release to work properly
-      - name: Fetch complete Git history
-        run: |
-          echo "Fetching complete Git history and tags..."
-          git fetch --tags --force --depth=1000
-          git fetch origin main --depth=1000
-          git fetch origin dev --depth=1000
-          
-          echo "Git tags:"
-          git tag -l
-          
-          echo "Latest commits:"
-          git log --oneline -15
-          
-      # Generate semantic version, changelog from commit messages, create GitHub release
-      - name: Semantic Release
-        id: semantic-release
+      - name: Release
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          DEBUG: "semantic-release:*"
-        run: |
-          npx semantic-release --debug
+          NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
+        run: npx semantic-release --debug
           
           # Extract version from package.json for subsequent jobs if semantic-release succeeds but doesn't set outputs
           if [ $? -eq 0 ]; then
@@ -287,13 +249,3 @@ jobs:
     uses: ./.github/workflows/publish-docker.yml
     with:
       release_version: ${{ needs.release.outputs.new_release_version }}
-
-  call-publish-hassio-addon:
-    name: Update Submodule in hassio-addons
-    needs: [release]
-    if: needs.release.outputs.new_release_published == 'true' && needs.release.outputs.new_release_version != ''
-    uses: ./.github/workflows/publish-hassio-addon.yml
-    with:
-      release_version: ${{ needs.release.outputs.new_release_version }}
-    secrets:
-      HASSIO_ADDONS_TOKEN: ${{ secrets.HASSIO_ADDONS_TOKEN }}

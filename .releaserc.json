@@ -21,7 +21,9 @@
     [
       "@semantic-release/github",
       {
-        "assets": []
+        "assets": [],
+        "failComment": false,
+        "failTitle": false
       }
     ]
   ]
