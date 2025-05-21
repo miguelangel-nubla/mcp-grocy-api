@@ -409,7 +409,7 @@ jobs:
       - name: Update mcp-grocy-api submodule
         env:
           RELEASE_TAG: ${{ needs.release.outputs.new_release_version }}
-          SUBMODULE_PATH: mcp_grocy_api 
+          SUBMODULE_PATH: mcp-grocy-api 
           CURRENT_REPO_URL: https://github.com/${{ github.repository }}.git
         run: |
           set -e # Exit immediately if a command exits with a non-zero status.
