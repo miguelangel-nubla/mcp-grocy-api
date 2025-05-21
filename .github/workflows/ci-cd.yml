@@ -369,15 +369,11 @@ jobs:
             fi
           fi
           echo "Creating manifest for version: $RELEASE_VERSION"
-          # Create manifest for the specific version tag
-          docker buildx imagetools create -t ghcr.io/${{ github.repository }}:$RELEASE_VERSION \\
-            ghcr.io/${{ github.repository }}:latest-amd64 \\
-            ghcr.io/${{ github.repository }}:latest-arm64
+          # Create manifest for the specific version tag - command on a single line
+          docker buildx imagetools create -t ghcr.io/${{ github.repository }}:$RELEASE_VERSION ghcr.io/${{ github.repository }}:latest-amd64 ghcr.io/${{ github.repository }}:latest-arm64
           echo "Creating manifest for tag: latest"
-          # Create manifest for the 'latest' tag
-          docker buildx imagetools create -t ghcr.io/${{ github.repository }}:latest \\
-            ghcr.io/${{ github.repository }}:latest-amd64 \\
-            ghcr.io/${{ github.repository }}:latest-arm64
+          # Create manifest for the 'latest' tag - command on a single line
+          docker buildx imagetools create -t ghcr.io/${{ github.repository }}:latest ghcr.io/${{ github.repository }}:latest-amd64 ghcr.io/${{ github.repository }}:latest-arm64
         shell: bash
 
       - name: Docker Publish Summary
@@ -413,88 +409,89 @@ jobs:
       - name: Update mcp-grocy-api submodule
         env:
           RELEASE_TAG: ${{ needs.release.outputs.new_release_version }}
-          # IMPORTANT: Confirm this is the correct path to the submodule within hassio-addons.
-          # This script assumes 'mcp_grocy_api'.
           SUBMODULE_PATH: mcp_grocy_api 
           CURRENT_REPO_URL: https://github.com/${{ github.repository }}.git
         run: |
           set -e # Exit immediately if a command exits with a non-zero status.
-          echo "Attempting to update submodule \'$SUBMODULE_PATH\' to tag: $RELEASE_TAG"
+          echo "Attempting to update submodule '$SUBMODULE_PATH' to tag: $RELEASE_TAG"
 
           if [ -z "$RELEASE_TAG" ]; then
             echo "Error: RELEASE_TAG is empty. Cannot update submodule."
             exit 1
           fi
 
-          # Check if .gitmodules and the submodule path exist and is configured for this SUBMODULE_PATH
           if [ -f ".gitmodules" ] && grep -q "path = $SUBMODULE_PATH" .gitmodules; then
-            echo "Submodule \'$SUBMODULE_PATH\' is configured. Initializing and updating..."
-            # Initialize the submodule if it hasn\'t been, and update it to the commit recorded in the superproject.
-            # Use --force to ensure it checks out even if the directory has local changes (shouldn\'t in CI).
+            echo "Submodule '$SUBMODULE_PATH' is configured. Initializing and updating..."
             git submodule update --init --force $SUBMODULE_PATH
           else
-            echo "Submodule \'$SUBMODULE_PATH\' not configured or path does not exist. Adding it."
-            # Remove any existing directory at SUBMODULE_PATH to avoid conflicts with `git submodule add`
+            echo "Submodule '$SUBMODULE_PATH' not configured or path does not exist. Adding it."
             rm -rf $SUBMODULE_PATH
             git submodule add --force --name $SUBMODULE_PATH $CURRENT_REPO_URL $SUBMODULE_PATH
-            # `git submodule add` already stages .gitmodules and the submodule directory.
           fi
           
-          # Navigate into the submodule directory
           cd $SUBMODULE_PATH
           echo "Inside submodule directory: $(pwd)"
 
-          # Fetch all tags from the submodule\'s origin (mcp-grocy-api repo)
+          echo "Fetching tags from origin..."
           git fetch origin --tags --force
           
-          echo "Checking out tag \'$RELEASE_TAG\'..."
-          
-          # Get commit hash tag points to. Try 'tags/TAG_NAME' then 'TAG_NAME'.
-          TAG_COMMIT=$(git rev-parse "tags/$RELEASE_TAG^{commit}" 2>/dev/null || git rev-parse "$RELEASE_TAG^{commit}" 2>/dev/null)
+          echo "--- Git Submodule Debug Info ---"
+          echo "Current git status:"
+          git status -sb # Short branch status
+          echo "Local branches:"
+          git branch
+          echo "Last 5 tags (local):"
+          git tag -l --sort=-creatordate | head -n 5
+          echo "--------------------------------"
+
+          echo "Resolving tag '$RELEASE_TAG' to a commit..."
+          # Try to resolve the tag to a commit SHA. Handles both annotated and lightweight tags.
+          # Add more specific rev-parse attempts.
+          TAG_COMMIT=$(git rev-parse --verify "$RELEASE_TAG^{commit}" 2>/dev/null || \
+                       git rev-parse --verify "tags/$RELEASE_TAG^{commit}" 2>/dev/null || \
+                       git rev-parse --verify "$RELEASE_TAG" 2>/dev/null)
+
 
           if [ -z "$TAG_COMMIT" ]; then
-            echo "Error: Could not resolve tag \'$RELEASE_TAG\' to a commit in $SUBMODULE_PATH."
-            echo "Available tags in $SUBMODULE_PATH:"
-            git tag -l | head -n 30 # List some tags for debugging
+            echo "Error: Could not resolve tag '$RELEASE_TAG' to a commit in $SUBMODULE_PATH."
+            echo "Listing all available local tags in $SUBMODULE_PATH (git tag -l):"
+            git tag -l | cat # Use cat to ensure it's not truncated by log limits
+            echo "Listing remote tags from 'git ls-remote --tags origin':"
+            git ls-remote --tags origin | cat
             exit 1
           fi
+          echo "Resolved tag '$RELEASE_TAG' to commit SHA: $TAG_COMMIT"
 
-          # Try checking out the tag directly first (works for annotated and lightweight tags)
-          # Use --force to ensure checkout even if it means detaching HEAD or changing branches.
-          git checkout "$RELEASE_TAG" --force
-          CHECKED_OUT_COMMIT=$(git rev-parse HEAD)
-
-          # Verify if the checkout matches the expected commit hash of the tag
-          if [ "$CHECKED_OUT_COMMIT" != "$TAG_COMMIT" ]; then
-            # Fallback: try with 'tags/' prefix if the direct tag name didn't point to the right commit
-            # This can happen depending on how tags are fetched or local git configuration.
-            echo "Direct checkout of \'$RELEASE_TAG\' resulted in $CHECKED_OUT_COMMIT, expected $TAG_COMMIT. Retrying with \'tags/$RELEASE_TAG\'."
-            git checkout "tags/$RELEASE_TAG" --force
-            CHECKED_OUT_COMMIT=$(git rev-parse HEAD)
-            if [ "$CHECKED_OUT_COMMIT" != "$TAG_COMMIT" ]; then
-                echo "Error: Failed to checkout tag \'$RELEASE_TAG\'. Expected commit: $TAG_COMMIT, but got: $CHECKED_OUT_COMMIT"
-                exit 1
+          echo "Attempting to checkout commit '$TAG_COMMIT' (derived from tag '$RELEASE_TAG')..."
+          # Use -c advice.detachedHead=false to suppress the detached HEAD advice message.
+          if git -c advice.detachedHead=false checkout "$TAG_COMMIT" --force; then
+            CURRENT_HEAD_COMMIT=$(git rev-parse HEAD)
+            if [ "$CURRENT_HEAD_COMMIT" == "$TAG_COMMIT" ]; then
+              echo "Successfully checked out commit '$TAG_COMMIT' (from tag '$RELEASE_TAG')."
+            else
+              # This should not happen if 'git checkout $TAG_COMMIT' (a SHA) succeeds.
+              echo "Error: After checkout, HEAD is at '$CURRENT_HEAD_COMMIT', but expected '$TAG_COMMIT'."
+              exit 1
             fi
+          else
+            CHECKOUT_EC=$?
+            echo "Error: 'git checkout \"$TAG_COMMIT\" --force' failed with exit code $CHECKOUT_EC."
+            echo "This can happen if the commit object $TAG_COMMIT is not available locally, despite the tag being resolved."
+            echo "Verifying commit object existence with 'git cat-file -t $TAG_COMMIT':"
+            git cat-file -t "$TAG_COMMIT" || echo "cat-file check also failed for $TAG_COMMIT (exit code $?). This means the commit object is likely missing or corrupt."
+            exit $CHECKOUT_EC
           fi
-          echo "Successfully checked out tag \'$RELEASE_TAG\' (commit $CHECKED_OUT_COMMIT)."
           
-          # Navigate back to the root of the hassio-addons repository
           cd .. 
           echo "Back in hassio-addons root: $(pwd)"
 
-          # Stage the updated submodule path. 
-          # If `git submodule add` was used, it\'s already staged by that command.
-          # If `git submodule update` was used, the change in $SUBMODULE_PATH (new commit) needs to be staged.
           git add $SUBMODULE_PATH
-          # If `git submodule add` was used, .gitmodules is also staged. Ensure it\'s added if not.
-          if [ -f ".gitmodules" ]; then # Ensure .gitmodules is staged if it was modified (e.g. by `submodule add`)
+          if [ -f ".gitmodules" ]; then
             git add .gitmodules
           fi
 
-          # Check if there are any changes to commit
-          # `git diff --staged --quiet` returns 0 if no changes, 1 if changes.
           if git diff --staged --quiet; then
-            echo "No changes to commit. Submodule \'$SUBMODULE_PATH\' might already be at tag \'$RELEASE_TAG\'."
+            echo "No changes to commit. Submodule '$SUBMODULE_PATH' might already be at tag '$RELEASE_TAG'."
           else
             echo "Changes detected. Committing and pushing to hassio-addons..."
             # Use printf for safer multi-line string construction for the commit message
