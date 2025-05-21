@@ -1,3 +1,10 @@
+## [1.4.9](https://github.com/saya6k/mcp-grocy-api/compare/v1.4.8...v1.4.9) (2025-05-21)
+
+
+### Bug Fixes
+
+* fix Dockerfile to expose HTTP_SERVER_PORT environment ([646383a](https://github.com/saya6k/mcp-grocy-api/commit/646383ae9880ff57cc5c80356db5c378f8c5ffdf))
+
 ## [1.4.8](https://github.com/saya6k/mcp-grocy-api/compare/v1.4.7...v1.4.8) (2025-05-21)
 
 
