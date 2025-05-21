@@ -497,14 +497,8 @@ jobs:
             echo "No changes to commit. Submodule '$SUBMODULE_PATH' might already be at tag '$RELEASE_TAG'."
           else
             echo "Changes detected. Committing and pushing to hassio-addons..."
-            # Use printf for safer multi-line string construction for the commit message
-            COMMIT_MESSAGE=$(printf \'Update %s to %s\\n\\nTriggered by release of %s@%s\\nCommit in %s: %s\' \\
-              "$SUBMODULE_PATH" \\
-              "$RELEASE_TAG" \\
-              "${{ github.repository }}" \\
-              "$RELEASE_TAG" \\
-              "${{ github.repository }}" \\
-              "${{ github.sha }}")
+            # Use printf for safer multi-line string construction for the commit message, all on one line for the shell
+            COMMIT_MESSAGE=$(printf 'Update %s to %s\n\nTriggered by release of %s@%s\nCommit in %s: %s' "$SUBMODULE_PATH" "$RELEASE_TAG" "${{ github.repository }}" "$RELEASE_TAG" "${{ github.repository }}" "${{ github.sha }}")
             
             git commit -m "$COMMIT_MESSAGE"
             git push
