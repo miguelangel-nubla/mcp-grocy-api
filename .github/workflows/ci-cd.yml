@@ -446,10 +446,13 @@ jobs:
 
           echo "Resolving tag '$RELEASE_TAG' to a commit..."
           # Try to resolve the tag to a commit SHA. Handles both annotated and lightweight tags.
-          # Add more specific rev-parse attempts.
+          # Also try with a 'v' prefix for the tag.
           TAG_COMMIT=$(git rev-parse --verify "$RELEASE_TAG^{commit}" 2>/dev/null || \
                        git rev-parse --verify "tags/$RELEASE_TAG^{commit}" 2>/dev/null || \
-                       git rev-parse --verify "$RELEASE_TAG" 2>/dev/null)
+                       git rev-parse --verify "$RELEASE_TAG" 2>/dev/null || \
+                       git rev-parse --verify "v$RELEASE_TAG^{commit}" 2>/dev/null || \
+                       git rev-parse --verify "tags/v$RELEASE_TAG^{commit}" 2>/dev/null || \
+                       git rev-parse --verify "v$RELEASE_TAG" 2>/dev/null)
 
 
           if [ -z "$TAG_COMMIT" ]; then
