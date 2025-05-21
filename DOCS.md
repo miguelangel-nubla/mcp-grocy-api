@@ -25,6 +25,8 @@ grocy_base_url: http://a0d7b954-grocy:80
 grocy_api_key: your_api_key_here
 enable_ssl_verify: false
 response_size_limit: 10000
+enable_http_server: true
+http_server_port: 8080
 ```
 
 ### Option: `grocy_base_url` (required)
@@ -46,6 +48,10 @@ response_size_limit: 10000
 ### Option: `enable_http_server` (optional)
 - Set to `false` to disable streamable http and sse protocol server.
 - Default: `true`
+
+### Option: `http_server_port` (optional)
+- Set to port you want to use in streamable http and sse protocol server.
+- Default: `8080`
 
 ## Communication
 
