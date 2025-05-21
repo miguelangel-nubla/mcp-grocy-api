@@ -292,11 +292,9 @@ jobs:
       - name: Check release version is set
         run: |
           if [ -z "$RELEASE_VERSION" ]; then
-            export RELEASE_VERSION=$(node -p "require('./package.json').version")
             echo "Fallback: version from package.json: $RELEASE_VERSION"
           fi
           if [ -z "$RELEASE_VERSION" ]; then
-            echo "::error::Release version is not set. Cannot build/publish Docker image."
             exit 1
           fi
           echo "Using version: $RELEASE_VERSION"
@@ -317,10 +315,8 @@ jobs:
           fi
           echo "Checking if Docker image for version $RELEASE_VERSION already exists..."
           if docker buildx imagetools inspect ghcr.io/${{ github.repository }}:$RELEASE_VERSION &>/dev/null; then
-            echo "Image already exists in registry. Skipping build."
             echo "image_exists=true" >> $GITHUB_OUTPUT
           else
-            echo "Image does not exist yet. Proceeding with build."
             echo "image_exists=false" >> $GITHUB_OUTPUT
           fi
         shell: bash
@@ -341,7 +337,6 @@ jobs:
           platforms: linux/amd64
           push: true
           tags: |
-            ghcr.io/${{ github.repository }}:${{ env.RELEASE_VERSION }}-amd64
             ghcr.io/${{ github.repository }}:latest-amd64
           build-args: |
             NODE_VERSION=20
@@ -356,10 +351,8 @@ jobs:
           platforms: linux/arm64
           push: true
           tags: |
-            ghcr.io/${{ github.repository }}:${{ env.RELEASE_VERSION }}-arm64
             ghcr.io/${{ github.repository }}:latest-arm64
           build-args: |
-            NODE_VERSION=20
             NODE_OPTIONS=--max_old_space_size=4096
           cache-from: type=registry,ref=ghcr.io/${{ github.repository }}:latest-arm64
           cache-to: type=inline
@@ -368,13 +361,22 @@ jobs:
         if: steps.check_image.outputs.image_exists != 'true'
         run: |
           if [ -z "$RELEASE_VERSION" ]; then
+            # This fallback should ideally not be needed if 'release' job works.
             export RELEASE_VERSION=$(node -p "require('./package.json').version")
+            if [ -z "$RELEASE_VERSION" ]; then
+              echo "Error: RELEASE_VERSION is empty and could not be determined from package.json."
+              exit 1
+            fi
           fi
-          docker buildx imagetools create -t ghcr.io/${{ github.repository }}:$RELEASE_VERSION \
-            ghcr.io/${{ github.repository }}:$RELEASE_VERSION-amd64 \
-            ghcr.io/${{ github.repository }}:$RELEASE_VERSION-arm64
-          docker buildx imagetools create -t ghcr.io/${{ github.repository }}:latest \
-            ghcr.io/${{ github.repository }}:latest-amd64 \
+          echo "Creating manifest for version: $RELEASE_VERSION"
+          # Create manifest for the specific version tag
+          docker buildx imagetools create -t ghcr.io/${{ github.repository }}:$RELEASE_VERSION \\
+            ghcr.io/${{ github.repository }}:latest-amd64 \\
+            ghcr.io/${{ github.repository }}:latest-arm64
+          echo "Creating manifest for tag: latest"
+          # Create manifest for the 'latest' tag
+          docker buildx imagetools create -t ghcr.io/${{ github.repository }}:latest \\
+            ghcr.io/${{ github.repository }}:latest-amd64 \\
             ghcr.io/${{ github.repository }}:latest-arm64
         shell: bash
 
@@ -385,93 +387,127 @@ jobs:
           fi
           if [[ "${{ steps.check_image.outputs.image_exists }}" == "true" ]]; then
             echo "Image for version $RELEASE_VERSION already exists in the registry. No new image was built."
-          else
-            echo "Successfully built and published Docker image for version $RELEASE_VERSION."
           fi
         shell: bash
 
   publish-hassio-addons:
+    name: Update Submodule in hassio-addons
     runs-on: ubuntu-latest
-    needs: [publish-npm]
-    # Always update the submodule for main branch pushes - no version condition
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    needs: [release]
+    if: needs.release.outputs.new_release_published == 'true' && needs.release.outputs.new_release_version != ''
     steps:
       - name: Checkout hassio-addons repository
         uses: actions/checkout@v4
         with:
-          repository: saya6k/hassio-addons
-          token: ${{ secrets.HASSIO_ADDONS_TOKEN }}
-          path: hassio-addons
+          repository: saya6k/hassio-addons # IMPORTANT: Confirm this is the correct parent repository
+          token: ${{ secrets.HASSIO_ADDONS_TOKEN }} # PAT with write access to the parent repository
+          path: hassio-addons # Checkout to a specific directory
+          ref: main # IMPORTANT: Confirm this is the default branch of hassio-addons
 
-      - name: Setup Git configuration
-        working-directory: hassio-addons
+      - name: Setup Git User
         run: |
-          git config --local user.email "github-actions[bot]@users.noreply.github.com"
-          git config --local user.name "github-actions[bot]"
-      
-      - name: Check if submodule exists
-        id: check-submodule
-        working-directory: hassio-addons
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+        working-directory: ./hassio-addons
+
+      - name: Update mcp-grocy-api submodule
+        env:
+          RELEASE_TAG: ${{ needs.release.outputs.new_release_version }}
+          # IMPORTANT: Confirm this is the correct path to the submodule within hassio-addons.
+          # This script assumes 'mcp_grocy_api'.
+          SUBMODULE_PATH: mcp_grocy_api 
+          CURRENT_REPO_URL: https://github.com/${{ github.repository }}.git
         run: |
-          if grep -q "mcp-grocy-api" .gitmodules 2>/dev/null; then
-            echo "SUBMODULE_EXISTS=true" >> $GITHUB_OUTPUT
-          else
-            echo "SUBMODULE_EXISTS=false" >> $GITHUB_OUTPUT
+          set -e # Exit immediately if a command exits with a non-zero status.
+          echo "Attempting to update submodule \'$SUBMODULE_PATH\' to tag: $RELEASE_TAG"
+
+          if [ -z "$RELEASE_TAG" ]; then
+            echo "Error: RELEASE_TAG is empty. Cannot update submodule."
+            exit 1
           fi
-      
-      - name: Update existing submodule
-        if: steps.check-submodule.outputs.SUBMODULE_EXISTS == 'true'
-        working-directory: hassio-addons
-        run: |
-          # More robust submodule update that doesn't fail if there are issues with other submodules
-          git config -f .gitmodules --get-regexp '^submodule\.mcp-grocy-api\.path$' || true
-          
-          # Check if the directory exists and is a git repository
-          if [ -d "mcp-grocy-api" ] && [ -d "mcp-grocy-api/.git" ]; then
-            cd mcp-grocy-api
-            git fetch
-            git checkout main
-            git pull
-            cd ..
+
+          # Check if .gitmodules and the submodule path exist and is configured for this SUBMODULE_PATH
+          if [ -f ".gitmodules" ] && grep -q "path = $SUBMODULE_PATH" .gitmodules; then
+            echo "Submodule \'$SUBMODULE_PATH\' is configured. Initializing and updating..."
+            # Initialize the submodule if it hasn\'t been, and update it to the commit recorded in the superproject.
+            # Use --force to ensure it checks out even if the directory has local changes (shouldn\'t in CI).
+            git submodule update --init --force $SUBMODULE_PATH
           else
-            # If directory doesn't exist or isn't a git repo, initialize just this submodule
-            git submodule init mcp-grocy-api
-            git submodule update --remote mcp-grocy-api
+            echo "Submodule \'$SUBMODULE_PATH\' not configured or path does not exist. Adding it."
+            # Remove any existing directory at SUBMODULE_PATH to avoid conflicts with `git submodule add`
+            rm -rf $SUBMODULE_PATH
+            git submodule add --force --name $SUBMODULE_PATH $CURRENT_REPO_URL $SUBMODULE_PATH
+            # `git submodule add` already stages .gitmodules and the submodule directory.
           fi
           
-          # Commit the updated submodule
-          git add mcp-grocy-api
-          git commit -m "chore: update mcp-grocy-api submodule to latest version" || echo "No changes to commit"
-          git push || echo "No changes to push"
-      
-      - name: Check and update gitignore
-        if: steps.check-submodule.outputs.SUBMODULE_EXISTS == 'false'
-        working-directory: hassio-addons
-        run: |
-          # Check if mcp-grocy-api is in .gitignore
-          if grep -q "mcp-grocy-api" .gitignore 2>/dev/null; then
-            # Remove or comment out the line from .gitignore
-            sed -i 's/mcp-grocy-api/#mcp-grocy-api - submodule now/g' .gitignore
-            git add .gitignore
-            git commit -m "chore: update .gitignore to allow mcp-grocy-api submodule"
+          # Navigate into the submodule directory
+          cd $SUBMODULE_PATH
+          echo "Inside submodule directory: $(pwd)"
+
+          # Fetch all tags from the submodule\'s origin (mcp-grocy-api repo)
+          git fetch origin --tags --force
+          
+          echo "Checking out tag \'$RELEASE_TAG\'..."
+          
+          # Get commit hash tag points to. Try 'tags/TAG_NAME' then 'TAG_NAME'.
+          TAG_COMMIT=$(git rev-parse "tags/$RELEASE_TAG^{commit}" 2>/dev/null || git rev-parse "$RELEASE_TAG^{commit}" 2>/dev/null)
+
+          if [ -z "$TAG_COMMIT" ]; then
+            echo "Error: Could not resolve tag \'$RELEASE_TAG\' to a commit in $SUBMODULE_PATH."
+            echo "Available tags in $SUBMODULE_PATH:"
+            git tag -l | head -n 30 # List some tags for debugging
+            exit 1
+          fi
+
+          # Try checking out the tag directly first (works for annotated and lightweight tags)
+          # Use --force to ensure checkout even if it means detaching HEAD or changing branches.
+          git checkout "$RELEASE_TAG" --force
+          CHECKED_OUT_COMMIT=$(git rev-parse HEAD)
+
+          # Verify if the checkout matches the expected commit hash of the tag
+          if [ "$CHECKED_OUT_COMMIT" != "$TAG_COMMIT" ]; then
+            # Fallback: try with 'tags/' prefix if the direct tag name didn't point to the right commit
+            # This can happen depending on how tags are fetched or local git configuration.
+            echo "Direct checkout of \'$RELEASE_TAG\' resulted in $CHECKED_OUT_COMMIT, expected $TAG_COMMIT. Retrying with \'tags/$RELEASE_TAG\'."
+            git checkout "tags/$RELEASE_TAG" --force
+            CHECKED_OUT_COMMIT=$(git rev-parse HEAD)
+            if [ "$CHECKED_OUT_COMMIT" != "$TAG_COMMIT" ]; then
+                echo "Error: Failed to checkout tag \'$RELEASE_TAG\'. Expected commit: $TAG_COMMIT, but got: $CHECKED_OUT_COMMIT"
+                exit 1
+            fi
+          fi
+          echo "Successfully checked out tag \'$RELEASE_TAG\' (commit $CHECKED_OUT_COMMIT)."
+          
+          # Navigate back to the root of the hassio-addons repository
+          cd .. 
+          echo "Back in hassio-addons root: $(pwd)"
+
+          # Stage the updated submodule path. 
+          # If `git submodule add` was used, it\'s already staged by that command.
+          # If `git submodule update` was used, the change in $SUBMODULE_PATH (new commit) needs to be staged.
+          git add $SUBMODULE_PATH
+          # If `git submodule add` was used, .gitmodules is also staged. Ensure it\'s added if not.
+          if [ -f ".gitmodules" ]; then # Ensure .gitmodules is staged if it was modified (e.g. by `submodule add`)
+            git add .gitmodules
+          fi
+
+          # Check if there are any changes to commit
+          # `git diff --staged --quiet` returns 0 if no changes, 1 if changes.
+          if git diff --staged --quiet; then
+            echo "No changes to commit. Submodule \'$SUBMODULE_PATH\' might already be at tag \'$RELEASE_TAG\'."
+          else
+            echo "Changes detected. Committing and pushing to hassio-addons..."
+            # Use printf for safer multi-line string construction for the commit message
+            COMMIT_MESSAGE=$(printf \'Update %s to %s\\n\\nTriggered by release of %s@%s\\nCommit in %s: %s\' \\
+              "$SUBMODULE_PATH" \\
+              "$RELEASE_TAG" \\
+              "${{ github.repository }}" \\
+              "$RELEASE_TAG" \\
+              "${{ github.repository }}" \\
+              "${{ github.sha }}")
+            
+            git commit -m "$COMMIT_MESSAGE"
             git push
+            echo "Successfully pushed submodule update to hassio-addons."
           fi
-      
-      - name: Add new submodule if it doesn't exist
-        # This step will only run if the submodule doesn't exist
-        # and the previous step didn't find it in .gitignore
-        if: steps.check-submodule.outputs.SUBMODULE_EXISTS == 'false'
-        working-directory: hassio-addons
-        run: |
-          # Add the new submodule with force flag
-          git submodule add -f https://github.com/saya6k/mcp-grocy-api.git mcp-grocy-api
-          
-          # Directly initialize just this submodule without trying to init others
-          cd mcp-grocy-api
-          git checkout main
-          cd ..
-          
-          # Commit the new submodule
-          git add .gitmodules mcp-grocy-api
-          git commit -m "chore: add mcp-grocy-api submodule"
-          git push
+        working-directory: ./hassio-addons # Ensure all commands run in the checked-out parent repo
