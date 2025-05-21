@@ -369,15 +369,11 @@ jobs:
             fi
           fi
           echo "Creating manifest for version: $RELEASE_VERSION"
-          # Create manifest for the specific version tag
-          docker buildx imagetools create -t ghcr.io/${{ github.repository }}:$RELEASE_VERSION \\
-            ghcr.io/${{ github.repository }}:latest-amd64 \\
-            ghcr.io/${{ github.repository }}:latest-arm64
+          # Create manifest for the specific version tag - command on a single line
+          docker buildx imagetools create -t ghcr.io/${{ github.repository }}:$RELEASE_VERSION ghcr.io/${{ github.repository }}:latest-amd64 ghcr.io/${{ github.repository }}:latest-arm64
           echo "Creating manifest for tag: latest"
-          # Create manifest for the 'latest' tag
-          docker buildx imagetools create -t ghcr.io/${{ github.repository }}:latest \\
-            ghcr.io/${{ github.repository }}:latest-amd64 \\
-            ghcr.io/${{ github.repository }}:latest-arm64
+          # Create manifest for the 'latest' tag - command on a single line
+          docker buildx imagetools create -t ghcr.io/${{ github.repository }}:latest ghcr.io/${{ github.repository }}:latest-amd64 ghcr.io/${{ github.repository }}:latest-arm64
         shell: bash
 
       - name: Docker Publish Summary
