@@ -278,11 +278,9 @@ jobs:
     name: Publish Docker Image
     needs: [publish-npm, release]
     if: needs.release.outputs.new_release_published == 'true'
-    uses: ./.github/workflows/publish.docker.yml
+    uses: ./.github/workflows/publish-docker.yml
     with:
       release_version: ${{ needs.release.outputs.new_release_version }}
-    secrets:
-      GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
   call-publish-hassio-addon:
     name: Update Submodule in hassio-addons
