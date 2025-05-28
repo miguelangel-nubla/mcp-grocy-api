@@ -255,12 +255,6 @@ jobs:
     with:
       release_version: ${{ needs.release.outputs.new_release_version }}
 
-  call-publish-hassio-addon:
-    name: Update Submodule in hassio-addons
-    needs: [release]
-    if: needs.release.outputs.new_release_published == 'true' && needs.release.outputs.new_release_version != ''
-    uses: ./.github/workflows/publish-hassio-addon.yml
-    with:
-      release_version: ${{ needs.release.outputs.new_release_version }}
-    secrets:
-      HASSIO_ADDONS_TOKEN: ${{ secrets.HASSIO_ADDONS_TOKEN }}
+  # Note: Home Assistant addon building is now handled automatically
+  # by the Builder workflow in the hassio-addons repository.
+  # The Builder workflow detects submodule updates and builds addons automatically.
