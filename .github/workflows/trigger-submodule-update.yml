@@ -5,12 +5,25 @@ on:
     tags:
       - 'v*.*.*' # Trigger on tags like v1.0.0, v1.2.3, etc.
 
+permissions:
+  contents: read  # Need to read repository contents
+  actions: write  # Need to trigger other workflows
+
 jobs:
   call_publish_hassio_addon:
     name: Call Publish Hass.io Addon Workflow
     runs-on: ubuntu-latest
-    permissions: {} # No specific permissions needed for this job itself, the called workflow handles its own.
     steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        
+      - name: Debug tag information
+        run: |
+          echo "Event name: ${{ github.event_name }}"
+          echo "Ref: ${{ github.ref }}"
+          echo "Ref name: ${{ github.ref_name }}"
+          echo "SHA: ${{ github.sha }}"
+          
       - name: Get version from tag
         id: get_version
         run: |
@@ -27,3 +40,9 @@ jobs:
           release_version: ${{ steps.get_version.outputs.release_version }}
         secrets:
           HASSIO_ADDONS_TOKEN: ${{ secrets.HASSIO_ADDONS_TOKEN }}
+          
+      - name: Workflow completion
+        run: |
+          echo "=== Trigger Workflow Completed ==="
+          echo "Successfully triggered submodule update for version: ${{ steps.get_version.outputs.release_version }}"
+          echo "================================"

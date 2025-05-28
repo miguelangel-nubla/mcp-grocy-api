@@ -36,7 +36,10 @@ jobs:
           CURRENT_REPO_URL: https://github.com/${{ github.repository }}.git
         run: |
           set -e # Exit immediately if a command exits with a non-zero status.
-          echo "Attempting to update submodule \'$SUBMODULE_PATH\' to tag: $RELEASE_TAG"
+          echo "=== Submodule Update Process Started ==="
+          echo "Attempting to update submodule '$SUBMODULE_PATH' to tag: $RELEASE_TAG"
+          echo "Triggered by: ${{ github.event_name }} from ${{ github.repository }}"
+          echo "Workflow run ID: ${{ github.run_id }}"
 
           if [ -z "$RELEASE_TAG" ]; then
             echo "Error: RELEASE_TAG is empty. Cannot update submodule."
