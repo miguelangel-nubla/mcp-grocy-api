@@ -1133,7 +1133,7 @@ class GrocyApiServer {
         case 'get_products':
           return await this.handleGrocyApiCall('/objects/products', 'Get all products');
         case 'get_recipes':
-          return await this.handleGrocyApiCall('/objects/recipes', 'Get all recipes');
+          return await this.handleGrocyApiCall('/objects/recipes?query%5B%5D=type%3Dnormal', 'Get all recipes');
         case 'get_stock':
           return await this.handleGrocyApiCall('/stock', 'Get current stock');
         case 'get_batteries':
