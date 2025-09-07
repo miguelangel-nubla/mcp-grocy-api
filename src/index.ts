@@ -645,12 +645,14 @@ class GrocyApiServer {
               },
               servings: {
                 type: 'number',
-                description: 'Number of servings (default: 1)',
-                default: 1
+                description: 'Number of servings'
+              },
+              section_id: {
+                type: 'number',
+                description: 'ID of the meal plan section'
               }
-              // Removed 'section' parameter as it's not supported by the Grocy API
             },
-            required: ['recipeId'],
+            required: ['recipeId', 'servings', 'section_id'],
           },
         },
         {
@@ -1128,7 +1130,7 @@ class GrocyApiServer {
         case 'undo_action':
           return await this.handleUndoAction(request);
         case 'get_meal_plan':
-          const date = request.params.arguments?.date;
+          const date = request.params.arguments?.date || new Date().toISOString().split('T')[0];
           return await this.handleGrocyApiCall(`/objects/meal_plan?query%5B%5D=day%3D${date}&limit=100`, 'Get meal plan');
         case 'get_products':
           return await this.handleGrocyApiCall('/objects/products', 'Get all products');
@@ -1156,14 +1158,21 @@ class GrocyApiServer {
             body: shoppingListItemData
           });
         case 'add_recipe_to_meal_plan':
-          const { recipeId: mealPlanRecipeId, day = new Date().toISOString().split('T')[0], servings: mealPlanServings = 1 } = request.params.arguments || {};
+          const { recipeId: mealPlanRecipeId, day = new Date().toISOString().split('T')[0], servings: mealPlanServings, section_id } = request.params.arguments || {};
           if (!mealPlanRecipeId) {
             throw new McpError(ErrorCode.InvalidParams, 'recipeId is required');
+          }
+          if (!mealPlanServings) {
+            throw new McpError(ErrorCode.InvalidParams, 'servings is required');
+          }
+          if (!section_id) {
+            throw new McpError(ErrorCode.InvalidParams, 'section_id is required');
           }
           const mealPlanData = {
             day: day,
             recipe_id: mealPlanRecipeId,
             recipe_servings: mealPlanServings,
+            section_id: section_id,
             type: "recipe" // Add the type field to specify this is a recipe entry
           };
           return await this.handleGrocyApiCall('/objects/meal_plan', 'Add recipe to meal plan', {
