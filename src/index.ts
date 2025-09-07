@@ -550,10 +550,10 @@ class GrocyApiServer {
             properties: {
               date: {
                 type: 'string',
-                description: 'Date in YYYY-MM-DD format. Defaults to today.'
+                description: 'Date in YYYY-MM-DD format.'
               }
             },
-            required: [],
+            required: ['date'],
           },
         },
         {
@@ -1128,7 +1128,7 @@ class GrocyApiServer {
         case 'undo_action':
           return await this.handleUndoAction(request);
         case 'get_meal_plan':
-          const date = request.params.arguments?.date || new Date().toISOString().split('T')[0];
+          const date = request.params.arguments?.date;
           return await this.handleGrocyApiCall(`/objects/meal_plan?query%5B%5D=day%3D${date}&limit=100`, 'Get meal plan');
         case 'get_products':
           return await this.handleGrocyApiCall('/objects/products', 'Get all products');
