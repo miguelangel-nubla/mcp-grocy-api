@@ -85,12 +85,12 @@
   "author": "saya6k",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/saya6k/mcp-grocy-api.git"
+    "url": "git+https://github.com/miguelangel-nubla/mcp-grocy-api.git"
   },
   "bugs": {
-    "url": "https://github.com/saya6k/mcp-grocy-api/issues"
+    "url": "https://github.com/miguelangel-nubla/mcp-grocy-api/issues"
   },
-  "homepage": "https://github.com/saya6k/mcp-grocy-api#readme",
+  "homepage": "https://github.com/miguelangel-nubla/mcp-grocy-api#readme",
   "engines": {
     "node": ">=18.0.0"
   }
