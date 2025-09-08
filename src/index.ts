@@ -575,6 +575,20 @@ class GrocyApiServer {
           },
         },
         {
+          name: 'get_recipe_by_id',
+          description: 'Get a specific recipe by its ID from your Grocy instance.',
+          inputSchema: {
+            type: 'object',
+            properties: {
+              recipeId: {
+                type: 'number',
+                description: 'ID of the recipe to retrieve'
+              }
+            },
+            required: ['recipeId'],
+          },
+        },
+        {
           name: 'get_stock',
           description: 'Get current stock from your Grocy instance.',
           inputSchema: {
@@ -1136,6 +1150,12 @@ class GrocyApiServer {
           return await this.handleGrocyApiCall('/objects/products', 'Get all products');
         case 'get_recipes':
           return await this.handleGrocyApiCall('/objects/recipes?query%5B%5D=type%3Dnormal', 'Get all recipes');
+        case 'get_recipe_by_id':
+          const { recipeId: getRecipeId } = request.params.arguments || {};
+          if (!getRecipeId) {
+            throw new McpError(ErrorCode.InvalidParams, 'recipeId is required');
+          }
+          return await this.handleGrocyApiCall(`/objects/recipes/${getRecipeId}`, 'Get recipe by ID');
         case 'get_stock':
           return await this.handleGrocyApiCall('/stock', 'Get current stock');
         case 'get_batteries':
