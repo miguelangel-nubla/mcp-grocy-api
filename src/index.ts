@@ -173,6 +173,8 @@ const getCustomHeaders = (): Record<string, string> => {
 class GrocyApiServer {
   private server!: Server;
   private axiosInstance!: AxiosInstance;
+  private allowedTools: Set<string> | null = null;
+  private blockedTools: Set<string> = new Set();
   
   // Expose server instance for SSE isolation factory pattern
   public get serverInstance(): Server {
@@ -180,7 +182,67 @@ class GrocyApiServer {
   }
 
   constructor() {
+    this.parseToolConfiguration();
     this.setupServer();
+  }
+
+  private parseToolConfiguration() {
+    // Get all valid tool names for validation
+    const validToolNames = new Set(this.getAllToolDefinitions().map(tool => tool.name));
+
+    // Parse ALLOWED_TOOLS environment variable (comma-separated list)
+    const allowedToolsEnv = process.env.ALLOWED_TOOLS?.trim();
+    if (allowedToolsEnv) {
+      const allowedList = allowedToolsEnv.split(',').map(tool => tool.trim()).filter(Boolean);
+      
+      // Validate all tool names in allowed list
+      const invalidAllowedTools = allowedList.filter(tool => !validToolNames.has(tool));
+      if (invalidAllowedTools.length > 0) {
+        console.error(`[ERROR] Invalid tool names in ALLOWED_TOOLS: ${invalidAllowedTools.join(', ')}`);
+        console.error(`[ERROR] Valid tool names are: ${Array.from(validToolNames).sort().join(', ')}`);
+        process.exit(1);
+      }
+      
+      this.allowedTools = new Set(allowedList);
+      console.error(`[CONFIG] ALLOWED_TOOLS: ${Array.from(this.allowedTools).join(', ')}`);
+    }
+
+    // Parse BLOCKED_TOOLS environment variable (comma-separated list)
+    const blockedToolsEnv = process.env.BLOCKED_TOOLS?.trim();
+    if (blockedToolsEnv) {
+      const blockedList = blockedToolsEnv.split(',').map(tool => tool.trim()).filter(Boolean);
+      
+      // Validate all tool names in blocked list
+      const invalidBlockedTools = blockedList.filter(tool => !validToolNames.has(tool));
+      if (invalidBlockedTools.length > 0) {
+        console.error(`[ERROR] Invalid tool names in BLOCKED_TOOLS: ${invalidBlockedTools.join(', ')}`);
+        console.error(`[ERROR] Valid tool names are: ${Array.from(validToolNames).sort().join(', ')}`);
+        process.exit(1);
+      }
+      
+      this.blockedTools = new Set(blockedList);
+      console.error(`[CONFIG] BLOCKED_TOOLS: ${Array.from(this.blockedTools).join(', ')}`);
+    }
+
+    // If no configuration is provided, all tools are allowed
+    if (!this.allowedTools && this.blockedTools.size === 0) {
+      console.error('[CONFIG] No tool restrictions configured - all tools available');
+    }
+  }
+
+  private isToolAllowed(toolName: string): boolean {
+    // If tool is explicitly blocked, deny
+    if (this.blockedTools.has(toolName)) {
+      return false;
+    }
+
+    // If allowlist is configured, only allow tools in the list
+    if (this.allowedTools) {
+      return this.allowedTools.has(toolName);
+    }
+
+    // If no allowlist but blocklist exists, allow unless blocked
+    return true;
   }
 
   private async setupServer() {
@@ -416,9 +478,8 @@ class GrocyApiServer {
     });
   }
 
-  private setupToolHandlers() {
-    this.server.setRequestHandler(ListToolsRequestSchema, async () => ({
-      tools: [
+  private getAllToolDefinitions() {
+    return [
         {
           name: 'get_stock_volatile',
           description: 'Get volatile stock information (due products, overdue products, expired products, missing products).',
@@ -572,7 +633,7 @@ class GrocyApiServer {
         },
         {
           name: 'get_recipes',
-          description: 'Get all recipes from your Grocy instance.',
+          description: 'Get all recipes from your Grocy instance along with all available meal plan sections. Use this when you need to see all available recipes for meal planning or recipe management.',
           inputSchema: {
             type: 'object',
             properties: {},
@@ -681,6 +742,24 @@ class GrocyApiServer {
             type: 'object',
             properties: {},
             required: [],
+          },
+        },
+        {
+          name: 'delete_recipe_from_meal_plan',
+          description: 'Delete a specific recipe entry from the meal plan. Use get_meal_plan to find the meal_plan_entry_id of the entry you want to remove.',
+          inputSchema: {
+            type: 'object',
+            properties: {
+              date: {
+                type: 'string',
+                description: 'Date of the meal plan entry in YYYY-MM-DD format (e.g., "2024-12-25").'
+              },
+              meal_plan_entry_id: {
+                type: 'number',
+                description: 'ID of the specific meal plan entry to delete. Use get_meal_plan to find the correct entry ID.'
+              }
+            },
+            required: ['date', 'meal_plan_entry_id'],
           },
         },
         {
@@ -1120,10 +1199,28 @@ class GrocyApiServer {
             required: ['productId'],
           },
         },
-      ],
-    }));
+      ];
+  }
+
+  private setupToolHandlers() {
+    this.server.setRequestHandler(ListToolsRequestSchema, async () => {
+      const allTools = this.getAllToolDefinitions();
+      const filteredTools = allTools.filter(tool => this.isToolAllowed(tool.name));
+      
+      console.error(`[CONFIG] Available tools: ${filteredTools.map(t => t.name).join(', ')}`);
+      
+      return { tools: filteredTools };
+    });
 
     this.server.setRequestHandler(CallToolRequestSchema, async (request) => {
+      // Check if the tool is allowed to be executed
+      if (!this.isToolAllowed(request.params.name)) {
+        throw new McpError(
+          ErrorCode.InvalidRequest, 
+          `Tool '${request.params.name}' is not available. Check your ALLOWED_TOOLS or BLOCKED_TOOLS configuration.`
+        );
+      }
+
       switch (request.params.name) {
         case 'test_request':
           return await this.handleTestRequest(request);
@@ -1165,7 +1262,7 @@ class GrocyApiServer {
         case 'get_products':
           return await this.handleGrocyApiCall('/objects/products', 'Get all products');
         case 'get_recipes':
-          return await this.handleGrocyApiCall('/objects/recipes?query%5B%5D=type%3Dnormal', 'Get all recipes');
+          return await this.handleGetRecipes();
         case 'get_recipe_by_id':
           const { recipeId: getRecipeId } = request.params.arguments || {};
           if (!getRecipeId) {
@@ -1217,6 +1314,17 @@ class GrocyApiServer {
           return await this.handleGrocyApiCall('/objects/meal_plan', 'Add recipe to meal plan', {
             method: 'POST',
             body: mealPlanData
+          });
+        case 'delete_recipe_from_meal_plan':
+          const { date: deleteMealDate, meal_plan_entry_id } = request.params.arguments || {};
+          if (!deleteMealDate) {
+            throw new McpError(ErrorCode.InvalidParams, 'date is required. Specify the date in YYYY-MM-DD format (e.g., "2024-12-25").');
+          }
+          if (!meal_plan_entry_id) {
+            throw new McpError(ErrorCode.InvalidParams, 'meal_plan_entry_id is required. Use get_meal_plan to find the correct entry ID.');
+          }
+          return await this.handleGrocyApiCall(`/objects/meal_plan/${meal_plan_entry_id}`, 'Delete recipe from meal plan', {
+            method: 'DELETE'
           });
         case 'inventory_product':
           const { productId: invProductId, newAmount, bestBeforeDate, locationId, note: invNote } = request.params.arguments || {};
@@ -2041,6 +2149,53 @@ class GrocyApiServer {
             text: this.safeJsonStringify({
               error: `Failed to get meal plan: ${error.message}`,
               date: date
+            }),
+          },
+        ],
+        isError: true,
+      };
+    }
+  }
+
+  private async handleGetRecipes() {
+    try {
+      // Fetch all recipes and all meal plan sections in parallel
+      const [recipes, sections] = await Promise.all([
+        this.makeApiRequest('/objects/recipes?query%5B%5D=type%3Dnormal', 'GET'),
+        (async () => {
+          try {
+            const allSections = await this.makeApiRequest('/objects/meal_plan_sections', 'GET');
+            return Array.isArray(allSections) ? allSections.map(section => ({ id: section.id, ...section })) : [];
+          } catch (error: any) {
+            return [];
+          }
+        })()
+      ]);
+
+      return {
+        content: [
+          {
+            type: 'text',
+            text: this.safeJsonStringify({
+              recipes: Array.isArray(recipes) ? recipes : [],
+              all_available_meal_sections: sections.map(section => ({
+                id: section.id,
+                name: section.name,
+                sort_number: section.sort_number
+              }))
+            }),
+          },
+        ],
+      };
+    } catch (error: any) {
+      return {
+        content: [
+          {
+            type: 'text',
+            text: this.safeJsonStringify({
+              error: `Failed to get recipes: ${error.message}`,
+              recipes: [],
+              all_available_meal_sections: []
             }),
           },
         ],

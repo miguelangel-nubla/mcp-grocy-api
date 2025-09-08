@@ -112,6 +112,16 @@ use_mcp_tool('grocy-api', 'add_recipe_to_meal_plan', {
 
 Note: Use get_meal_plan_sections to find valid section IDs for your Grocy instance.
 
+### Delete Recipe from Meal Plan
+```typescript
+use_mcp_tool('grocy-api', 'delete_recipe_from_meal_plan', {
+  "date": "2024-07-01",
+  "meal_plan_entry_id": 123
+});
+```
+
+Note: Use get_meal_plan to find the meal_plan_entry_id of the entry you want to remove.
+
 ### Consume Recipe Ingredients
 ```typescript
 use_mcp_tool('grocy-api', 'consume_recipe', {
