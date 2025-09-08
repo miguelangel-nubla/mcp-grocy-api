@@ -549,7 +549,7 @@ class GrocyApiServer {
         },
         {
           name: 'get_meal_plan',
-          description: 'Get your meal plan data from Grocy instance.',
+          description: 'Get your meal plan data from Grocy instance with corresponding recipe details. Returns planned meals for a specific date including recipe names, descriptions, meal sections, and other details. Use this to find out what recipes/meals are planned for a specific date (e.g., "what\'s for dinner tomorrow", "recipes for today", "meal plan for next week").',
           inputSchema: {
             type: 'object',
             properties: {
@@ -650,28 +650,37 @@ class GrocyApiServer {
         },
         {
           name: 'add_recipe_to_meal_plan',
-          description: 'Add a recipe to the meal plan.',
+          description: 'Add a recipe to the meal plan for a specific date and meal section. Use get_recipes to find recipe IDs and get_meal_plan_sections to find valid section IDs and their names.',
           inputSchema: {
             type: 'object',
             properties: {
               recipeId: {
                 type: 'number',
-                description: 'ID of the recipe to add'
+                description: 'ID of the recipe to add to the meal plan. Use get_recipes tool to find valid recipe IDs and their names.'
               },
               day: {
                 type: 'string',
-                description: 'Day to add the recipe to in YYYY-MM-DD format (default: today)'
+                description: 'Day to add the recipe to in YYYY-MM-DD format (e.g., "2024-12-25").'
               },
               servings: {
                 type: 'number',
-                description: 'Number of servings'
+                description: 'Number of servings for this meal plan entry (e.g., 2 for a family of two, 4 for a family of four).'
               },
               section_id: {
                 type: 'number',
-                description: 'ID of the meal plan section'
+                description: 'ID of the meal plan section that defines when this meal will be consumed (e.g., breakfast, lunch, dinner, snacks). Use get_meal_plan_sections tool to discover what sections are available in your Grocy instance and get their specific IDs and names.'
               }
             },
-            required: ['recipeId', 'servings', 'section_id'],
+            required: ['recipeId', 'day', 'servings', 'section_id'],
+          },
+        },
+        {
+          name: 'get_meal_plan_sections',
+          description: 'Get all available meal plan sections from your Grocy instance (e.g., Breakfast, Lunch, Dinner, Snacks). Use this to find valid section IDs for add_recipe_to_meal_plan.',
+          inputSchema: {
+            type: 'object',
+            properties: {},
+            required: [],
           },
         },
         {
@@ -1149,8 +1158,10 @@ class GrocyApiServer {
         case 'undo_action':
           return await this.handleUndoAction(request);
         case 'get_meal_plan':
-          const date = request.params.arguments?.date || new Date().toISOString().split('T')[0];
-          return await this.handleGrocyApiCall(`/objects/meal_plan?query%5B%5D=day%3D${date}&limit=100`, 'Get meal plan');
+          const date = request.params.arguments?.date as string || new Date().toISOString().split('T')[0];
+          return await this.handleGetMealPlan(date);
+        case 'get_meal_plan_sections':
+          return await this.handleGrocyApiCall('/objects/meal_plan_sections', 'Get all meal plan sections');
         case 'get_products':
           return await this.handleGrocyApiCall('/objects/products', 'Get all products');
         case 'get_recipes':
@@ -1183,15 +1194,18 @@ class GrocyApiServer {
             body: shoppingListItemData
           });
         case 'add_recipe_to_meal_plan':
-          const { recipeId: mealPlanRecipeId, day = new Date().toISOString().split('T')[0], servings: mealPlanServings, section_id } = request.params.arguments || {};
+          const { recipeId: mealPlanRecipeId, day, servings: mealPlanServings, section_id } = request.params.arguments || {};
           if (!mealPlanRecipeId) {
-            throw new McpError(ErrorCode.InvalidParams, 'recipeId is required');
+            throw new McpError(ErrorCode.InvalidParams, 'recipeId is required. Use get_recipes tool to find valid recipe IDs.');
+          }
+          if (!day) {
+            throw new McpError(ErrorCode.InvalidParams, 'day is required. Specify the date in YYYY-MM-DD format (e.g., "2024-12-25").');
           }
           if (!mealPlanServings) {
-            throw new McpError(ErrorCode.InvalidParams, 'servings is required');
+            throw new McpError(ErrorCode.InvalidParams, 'servings is required. Specify how many servings to plan for this meal (e.g., 2, 4).');
           }
           if (!section_id) {
-            throw new McpError(ErrorCode.InvalidParams, 'section_id is required');
+            throw new McpError(ErrorCode.InvalidParams, 'section_id is required. Use get_meal_plan_sections tool to find valid section IDs and their names.');
           }
           const mealPlanData = {
             day: day,
@@ -1918,6 +1932,115 @@ class GrocyApiServer {
             type: 'text',
             text: this.safeJsonStringify({
               error: `Failed to undo ${entityType} action: ${error.message}`,
+            }),
+          },
+        ],
+        isError: true,
+      };
+    }
+  }
+
+  private async handleGetMealPlan(date: string) {
+    try {
+      // First get the meal plan entries for the date
+      const mealPlanData = await this.makeApiRequest(`/objects/meal_plan?query%5B%5D=day%3D${date}&limit=100`, 'GET');
+      
+      if (!mealPlanData || !Array.isArray(mealPlanData)) {
+        return {
+          content: [
+            {
+              type: 'text',
+              text: this.safeJsonStringify({ message: 'No meal plan entries found for this date', date }),
+            },
+          ],
+        };
+      }
+
+      // If no meal plan entries, return empty result
+      if (mealPlanData.length === 0) {
+        return {
+          content: [
+            {
+              type: 'text',
+              text: this.safeJsonStringify({ 
+                message: 'No meals planned for this date',
+                date: date,
+                meal_plan_entries: []
+              }),
+            },
+          ],
+        };
+      }
+
+      // Extract unique recipe IDs from meal plan entries
+      const recipeIds = [...new Set(mealPlanData.map(entry => entry.recipe_id).filter(id => id))];
+
+      // Fetch recipe details for all recipe IDs
+      const recipePromises = recipeIds.map(async (recipeId) => {
+        try {
+          const recipe = await this.makeApiRequest(`/objects/recipes/${recipeId}`, 'GET');
+          return { id: recipeId, ...recipe };
+        } catch (error: any) {
+          return { id: recipeId, name: `Recipe ${recipeId} (details unavailable)`, error: error.message };
+        }
+      });
+
+      // Fetch ALL meal plan sections (not just the ones used in this date's meal plan)
+      const getAllSectionsPromise = async () => {
+        try {
+          const allSections = await this.makeApiRequest('/objects/meal_plan_sections', 'GET');
+          return Array.isArray(allSections) ? allSections.map(section => ({ id: section.id, ...section })) : [];
+        } catch (error: any) {
+          return [];
+        }
+      };
+
+      const [recipes, sections] = await Promise.all([
+        Promise.all(recipePromises),
+        getAllSectionsPromise()
+      ]);
+
+      const recipesMap = recipes.reduce((acc, recipe) => {
+        acc[recipe.id] = recipe;
+        return acc;
+      }, {} as any);
+
+      const sectionsMap = sections.reduce((acc, section) => {
+        acc[section.id] = section;
+        return acc;
+      }, {} as any);
+
+      // Enhance meal plan entries with recipe and section details
+      const enhancedMealPlan = mealPlanData.map(entry => ({
+        ...entry,
+        recipe_details: recipesMap[entry.recipe_id] || { name: `Recipe ${entry.recipe_id} (not found)` },
+        section_details: sectionsMap[entry.section_id] || { name: `Section ${entry.section_id}` }
+      }));
+
+      return {
+        content: [
+          {
+            type: 'text',
+            text: this.safeJsonStringify({
+              date: date,
+              meal_plan_entries: enhancedMealPlan,
+              all_available_meal_sections: sections.map(section => ({
+                id: section.id,
+                name: section.name,
+                sort_number: section.sort_number
+              }))
+            }),
+          },
+        ],
+      };
+    } catch (error: any) {
+      return {
+        content: [
+          {
+            type: 'text',
+            text: this.safeJsonStringify({
+              error: `Failed to get meal plan: ${error.message}`,
+              date: date
             }),
           },
         ],

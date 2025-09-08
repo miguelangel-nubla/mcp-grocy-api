@@ -88,14 +88,29 @@ use_mcp_tool('grocy-api', 'get_recipe_fulfillment', {
 });
 ```
 
+### Get Meal Plan for a Date
+```typescript
+use_mcp_tool('grocy-api', 'get_meal_plan', {
+  "date": "2024-07-01"
+});
+```
+
+### Get Meal Plan Sections
+```typescript
+use_mcp_tool('grocy-api', 'get_meal_plan_sections', {});
+```
+
 ### Add Recipe to Meal Plan
 ```typescript
 use_mcp_tool('grocy-api', 'add_recipe_to_meal_plan', {
   "recipeId": 1,
-  "day": "2024-07-01",
-  "servings": 2
+  "day": "2024-07-01", 
+  "servings": 2,
+  "section_id": 3
 });
 ```
+
+Note: Use get_meal_plan_sections to find valid section IDs for your Grocy instance.
 
 ### Consume Recipe Ingredients
 ```typescript
