@@ -8,7 +8,7 @@ import cors from 'cors';
 import http from 'http';
 
 // HTTP Transport for MCP (Context7 style)
-export function startHttpServer(mcpServer: Server, port: number = 8080) {
+export function startHttpServer(mcpServer: Server | (() => Server), port: number = 8080) {
   const app = express();
   
   // Enable JSON body parsing with increased limit
@@ -43,12 +43,22 @@ export function startHttpServer(mcpServer: Server, port: number = 8080) {
   // Session management for transports
   const streamableTransports: Record<string, StreamableHTTPServerTransport> = {};
   const sseTransports: Record<string, SSEServerTransport> = {};
+  const sseServerInstances: Record<string, Server> = {};
 
   // Middleware to log all requests
   app.use((req, res, next) => {
     console.error(`[${new Date().toISOString()}] ${req.method} ${req.path} - Headers: ${JSON.stringify(req.headers)}`);
     next();
   });
+
+  // Helper function to get server instance (shared or new)
+  const getServerInstance = () => {
+    if (typeof mcpServer === 'function') {
+      return mcpServer(); // Create new instance
+    } else {
+      return mcpServer; // Use shared instance
+    }
+  };
 
   // Streamable HTTP endpoint (Context7 modern)
   app.post('/mcp', async (req, res) => {
@@ -128,8 +138,9 @@ export function startHttpServer(mcpServer: Server, port: number = 8080) {
           }
         };
 
+        const serverInstance = getServerInstance();
         console.error(`[DEBUG] Connecting new transport (intended ID: ${newGeneratedSessionId}, actual transport.sessionId: ${transport.sessionId}) to MCP server`);
-        await mcpServer.connect(transport); 
+        await serverInstance.connect(transport); 
         console.error(`[DEBUG] New transport (ID: ${transport.sessionId}) connected successfully`);
       }
 
@@ -167,8 +178,6 @@ export function startHttpServer(mcpServer: Server, port: number = 8080) {
 
   // SSE endpoint
   app.get('/mcp/sse', async (req, res) => {
-    console.error('[DEBUG] Incoming SSE connection request');
-    
     try {
       // Set SSE headers before creating transport
       res.setHeader('Content-Type', 'text/event-stream');
@@ -178,36 +187,41 @@ export function startHttpServer(mcpServer: Server, port: number = 8080) {
       const transport = new SSEServerTransport('/mcp/messages', res);
       const sessionId = transport.sessionId;
       
-      console.error(`[DEBUG] Created SSE transport with session ID: ${sessionId}`);
       sseTransports[sessionId] = transport;
       
-      // Handle connection close
-      res.on('close', () => {
-        console.error(`[DEBUG] SSE connection closed for session ID: ${sessionId}`);
+      // Handle connection cleanup
+      const cleanup = () => {
         delete sseTransports[sessionId];
-      });
+        delete sseServerInstances[sessionId];
+      };
       
-      // Adding event for error handling
+      res.on('close', cleanup);
       res.on('error', (err) => {
-        console.error(`[ERROR] SSE connection error for session ID: ${sessionId}:`, err);
-        delete sseTransports[sessionId];
+        console.error(`[ERROR] SSE connection error for session ${sessionId}:`, err);
+        cleanup();
       });
       
-      // Connect transport to MCP server
-      console.error('[DEBUG] Connecting SSE transport to MCP server');
-      await mcpServer.connect(transport);
-      console.error(`[DEBUG] SSE transport connected for session ${sessionId}`);
+      // Create isolated server instance for this SSE connection to prevent response cross-talk
+      const isolatedServer = getServerInstance();
+      sseServerInstances[sessionId] = isolatedServer;
+      
+      // Connect transport to isolated MCP server (non-blocking)
+      isolatedServer.connect(transport).catch((error) => {
+        console.error(`[ERROR] Failed to connect SSE transport for session ${sessionId}:`, error);
+        cleanup();
+        if (!res.headersSent) {
+          res.status(500).end();
+        }
+      });
       
       // Send initial comment to keep connection alive
       res.write(': connected\n\n');
     } catch (error) {
       console.error('[ERROR] Failed to handle SSE connection:', error);
       
-      // Send error response if headers not sent yet
       if (!res.headersSent) {
         res.status(500).send('Internal Server Error');
       } else {
-        // If headers are sent, we need to end the response
         res.end();
       }
     }
@@ -216,10 +230,8 @@ export function startHttpServer(mcpServer: Server, port: number = 8080) {
   // Message endpoint for SSE
   app.post('/mcp/messages', async (req, res) => {
     const sessionId = req.query.sessionId as string;
-    console.error(`[DEBUG] Incoming message for SSE session ID: ${sessionId}`);
     
     if (!sessionId) {
-      console.error('[ERROR] No sessionId provided in request');
       res.status(400).json({
         error: 'Missing sessionId parameter',
         status: 400
@@ -230,17 +242,15 @@ export function startHttpServer(mcpServer: Server, port: number = 8080) {
     const transport = sseTransports[sessionId];
     if (transport) {
       try {
-        console.error(`[DEBUG] Found transport for session ID: ${sessionId}, handling message`);
         await transport.handlePostMessage(req, res, req.body);
       } catch (error) {
-        console.error(`[ERROR] Failed to handle SSE message for session ID: ${sessionId}:`, error);
+        console.error(`[ERROR] Failed to handle SSE message for session ${sessionId}:`, error);
         res.status(500).json({
           error: `Internal server error: ${error instanceof Error ? error.message : String(error)}`,
           status: 500
         });
       }
     } else {
-      console.error(`[ERROR] No transport found for session ID: ${sessionId}`);
       res.status(404).json({
         error: `No active SSE connection found for session ID: ${sessionId}`,
         status: 404

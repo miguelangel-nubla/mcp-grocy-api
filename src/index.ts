@@ -173,6 +173,11 @@ const getCustomHeaders = (): Record<string, string> => {
 class GrocyApiServer {
   private server!: Server;
   private axiosInstance!: AxiosInstance;
+  
+  // Expose server instance for SSE isolation factory pattern
+  public get serverInstance(): Server {
+    return this.server;
+  }
 
   constructor() {
     this.setupServer();
@@ -1949,9 +1954,10 @@ class GrocyApiServer {
           console.error(`[ERROR] Invalid HTTP port value: ${portStr}, using default 8080`);
         }
         
-        // Start HTTP server
+        // Start HTTP server with server factory to create isolated instances for SSE connections
         console.error(`[CONFIG] Starting HTTP/SSE server on port ${port}`);
-        startHttpServer(this.server, port);
+        const serverFactory = () => new GrocyApiServer().serverInstance;
+        startHttpServer(serverFactory, port);
       } catch (error) {
         console.error(`[ERROR] Failed to start HTTP/SSE server:`, error);
       }
