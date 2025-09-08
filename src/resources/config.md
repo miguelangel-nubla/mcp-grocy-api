@@ -33,6 +33,55 @@ This document describes all available configuration options for the Grocy API MC
 - Example: `HTTP_SERVER_PORT=8080`
 - Usage: Set this to change the port the HTTP/SSE server listens on. Must match the port exposed in Docker or your deployment config.
 
+## Tool Access Control
+
+You can limit which tools are available to the LLM for enhanced security and control.
+
+### ALLOWED_TOOLS (Optional)
+- Description: Comma-separated list of tools that are allowed to be used.
+- Default: All tools are available if not specified.
+- Example: `ALLOWED_TOOLS="get_recipes,get_meal_plan,add_recipe_to_meal_plan"`
+- Usage: When set, only the specified tools will be available. All other tools will be hidden and blocked.
+
+### BLOCKED_TOOLS (Optional)
+- Description: Comma-separated list of tools that should be blocked/unavailable.
+- Default: No tools are blocked if not specified.
+- Example: `BLOCKED_TOOLS="create_recipe,call_grocy_api,test_request"`
+- Usage: When set, the specified tools will be unavailable. Can be used together with ALLOWED_TOOLS (blocked tools take precedence).
+
+### Tool Filtering Logic
+- If `ALLOWED_TOOLS` is set: Only tools in the allow list are available
+- If `BLOCKED_TOOLS` is set: Tools in the block list are removed from available tools
+- If both are set: Allow list is applied first, then block list is applied (block list takes precedence)
+- If neither is set: All tools are available
+
+### Validation
+- **Invalid tool names**: The server will exit with an error if any tool name in `ALLOWED_TOOLS` or `BLOCKED_TOOLS` doesn't match a valid tool
+- **Error output**: When invalid tools are detected, the server shows which tools are invalid and lists all valid tool names
+- **Startup failure**: The server will not start with invalid tool configurations, preventing silent failures
+
+### Example Configurations
+
+**Read-only access:**
+```bash
+ALLOWED_TOOLS="get_recipes,get_meal_plan,get_meal_plan_sections,get_products,get_stock,get_shopping_list,get_chores,get_tasks,get_locations,get_shopping_locations,get_product_groups,get_quantity_units,get_users,get_batteries,get_equipment,get_stock_volatile,get_recipe_by_id,get_price_history,get_stock_by_location,get_product_entries,get_recipe_fulfillment,get_recipes_fulfillment"
+```
+
+**Meal planning + recipes + shopping (safe management):**
+```bash
+ALLOWED_TOOLS="get_stock_volatile,get_shopping_list,get_chores,get_tasks,get_locations,get_shopping_locations,get_product_groups,get_quantity_units,get_users,get_recipes_fulfillment,get_meal_plan,get_products,get_recipes,get_recipe_by_id,get_stock,get_batteries,get_equipment,add_shopping_list_item,add_recipe_to_meal_plan,get_meal_plan_sections,delete_recipe_from_meal_plan,get_price_history,get_stock_by_location,get_product_entries,add_recipe_products_to_shopping_list,add_missing_products_to_shopping_list,get_recipe_fulfillment,remove_shopping_list_item"
+```
+
+**Meal planning only:**
+```bash
+ALLOWED_TOOLS="get_recipes,get_meal_plan,get_meal_plan_sections,add_recipe_to_meal_plan,delete_recipe_from_meal_plan,get_recipe_by_id,get_recipe_fulfillment"
+```
+
+**Block dangerous operations:**
+```bash
+BLOCKED_TOOLS="create_recipe,call_grocy_api,test_request,undo_action,purchase_product,consume_product,inventory_product,transfer_product,track_chore_execution,complete_task,charge_battery,consume_recipe,open_product"
+```
+
 ## Authentication Configuration
 
 The tool supports API Key authentication for Grocy.
