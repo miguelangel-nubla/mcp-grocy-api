@@ -5,30 +5,34 @@ import apiClient from '../../api/client.js';
 
 export class RecipeToolHandlers extends BaseToolHandler {
   public getRecipes: ToolHandler = async (args: any): Promise<ToolResult> => {
+    const { fields } = args || {};
+    if (!fields || !Array.isArray(fields) || fields.length === 0) {
+      throw new McpError(ErrorCode.InvalidParams, 'fields parameter is required and must be a non-empty array of field names');
+    }
+
     try {
-      // Fetch all recipes and all meal plan sections in parallel
-      const [recipesResponse, sectionsResponse] = await Promise.allSettled([
-        apiClient.get('/objects/recipes', { queryParams: { 'query[]': 'type=normal' } }),
-        apiClient.get('/objects/meal_plan_sections')
-      ]);
+      // Fetch recipes
+      const recipesResponse = await apiClient.get('/objects/recipes', { queryParams: { 'query[]': 'type=normal' } });
+      const recipes = recipesResponse.data;
 
-      const recipes = recipesResponse.status === 'fulfilled' ? recipesResponse.value.data : [];
-      const sections = sectionsResponse.status === 'fulfilled' ? 
-        (Array.isArray(sectionsResponse.value.data) ? sectionsResponse.value.data : []) : [];
+      if (!Array.isArray(recipes)) {
+        return this.createSuccessResult([]);
+      }
 
-      return this.createSuccessResult({
-        recipes: Array.isArray(recipes) ? recipes : [],
-        all_available_meal_sections: sections.map((section: any) => ({
-          id: section.id,
-          name: section.name,
-          sort_number: section.sort_number
-        }))
+      // Filter recipes to only include requested fields
+      const filteredRecipes = recipes.map((recipe: any) => {
+        const filtered: any = {};
+        fields.forEach(field => {
+          if (recipe.hasOwnProperty(field)) {
+            filtered[field] = recipe[field];
+          }
+        });
+        return filtered;
       });
+
+      return this.createSuccessResult(filteredRecipes);
     } catch (error: any) {
-      return this.createErrorResult(`Failed to get recipes: ${error.message}`, {
-        recipes: [],
-        all_available_meal_sections: []
-      });
+      return this.createErrorResult(`Failed to get recipes: ${error.message}`);
     }
   };
 

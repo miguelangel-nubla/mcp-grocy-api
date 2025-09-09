@@ -4,7 +4,31 @@ import { ErrorCode, McpError } from '@modelcontextprotocol/sdk/types.js';
 
 export class ProductToolHandlers extends BaseToolHandler {
   public getProducts: ToolHandler = async (args: any): Promise<ToolResult> => {
-    return this.handleApiCall('/objects/products', 'Get all products');
+    const { fields } = args || {};
+    if (!fields || !Array.isArray(fields) || fields.length === 0) {
+      throw new McpError(ErrorCode.InvalidParams, 'fields parameter is required and must be a non-empty array of field names');
+    }
+
+    const result = await this.handleApiCall('/objects/products', 'Get all products');
+    
+    if (result.isError || !result.content) {
+      return result;
+    }
+
+    // Filter the response to only include requested fields
+    const filteredData = Array.isArray(result.content) 
+      ? result.content.map((item: any) => {
+          const filtered: any = {};
+          fields.forEach(field => {
+            if (item.hasOwnProperty(field)) {
+              filtered[field] = item[field];
+            }
+          });
+          return filtered;
+        })
+      : result.content;
+
+    return this.createSuccessResult(filteredData);
   };
 
   public getProductEntries: ToolHandler = async (args: any): Promise<ToolResult> => {

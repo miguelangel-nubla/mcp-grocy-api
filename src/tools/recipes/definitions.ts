@@ -3,11 +3,20 @@ import { ToolDefinition } from '../types.js';
 export const recipeToolDefinitions: ToolDefinition[] = [
   {
     name: 'get_recipes',
-    description: 'Get all recipes from your Grocy instance along with all available meal plan sections. Use this when you need to see all available recipes for meal planning or recipe management.',
+    description: 'Get specific fields for all recipes from your Grocy instance. You must specify which fields to retrieve.',
     inputSchema: {
       type: 'object',
-      properties: {},
-      required: []
+      properties: {
+        fields: {
+          type: 'array',
+          items: {
+            type: 'string',
+            enum: ['id', 'name', 'description', 'base_servings', 'desired_servings', 'not_check_shoppinglist', 'type', 'picture_file_name', 'ingredients', 'instructions']
+          },
+          description: 'Array of field names to retrieve. For basic lookup use ["id", "name"]. For recipe planning use ["id", "name", "description", "base_servings"]. Available fields: id, name, description, base_servings, desired_servings, not_check_shoppinglist, type, picture_file_name, ingredients, instructions'
+        }
+      },
+      required: ['fields']
     }
   },
   {

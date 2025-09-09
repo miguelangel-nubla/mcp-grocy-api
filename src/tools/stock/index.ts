@@ -12,7 +12,8 @@ export const stockModule: ToolModule = {
     purchase_product: stockHandlers.purchaseProduct,
     consume_product: stockHandlers.consumeProduct,
     transfer_product: stockHandlers.transferProduct,
-    open_product: stockHandlers.openProduct
+    open_product: stockHandlers.openProduct,
+    lookup_product: stockHandlers.lookupProduct
   }
 };
 

@@ -50,7 +50,7 @@ export const stockToolDefinitions: ToolDefinition[] = [
         },
         newAmount: {
           type: 'number',
-          description: 'The new total amount in stock'
+          description: 'The new total amount in stock in the product\'s stock unit (e.g., 5 pieces, 2.5 kg, 1000 ml). Ensure you know the product\'s stock unit before specifying amount.'
         },
         bestBeforeDate: {
           type: 'string',
@@ -80,7 +80,7 @@ export const stockToolDefinitions: ToolDefinition[] = [
         },
         amount: {
           type: 'number',
-          description: 'Amount to purchase (default: 1)',
+          description: 'Amount to purchase in the product\'s stock unit (e.g., 1 piece, 2.5 kg, 500 ml). Ensure you know the product\'s stock unit before specifying amount. Default: 1',
           default: 1
         },
         bestBeforeDate: {
@@ -119,7 +119,7 @@ export const stockToolDefinitions: ToolDefinition[] = [
         },
         amount: {
           type: 'number',
-          description: 'Amount to consume (default: 1)',
+          description: 'Amount to consume in the product\'s stock unit (e.g., 1 piece, 0.5 kg, 250 ml). Ensure you know the product\'s stock unit before specifying amount. Default: 1',
           default: 1
         },
         spoiled: {
@@ -155,7 +155,7 @@ export const stockToolDefinitions: ToolDefinition[] = [
         },
         amount: {
           type: 'number',
-          description: 'Amount to transfer (default: 1)',
+          description: 'Amount to transfer in the product\'s stock unit (e.g., 1 piece, 0.5 kg, 250 ml). Ensure you know the product\'s stock unit before specifying amount. Default: 1',
           default: 1
         },
         locationIdFrom: {
@@ -190,7 +190,7 @@ export const stockToolDefinitions: ToolDefinition[] = [
         },
         amount: {
           type: 'number',
-          description: 'Amount to mark as opened (default: 1)',
+          description: 'Amount to mark as opened in the product\'s stock unit (e.g., 1 piece, 0.5 kg, 200 ml). Ensure you know the product\'s stock unit before specifying amount. Default: 1',
           default: 1
         },
         note: {
@@ -199,6 +199,20 @@ export const stockToolDefinitions: ToolDefinition[] = [
         }
       },
       required: []
+    }
+  },
+  {
+    name: 'lookup_product',
+    description: 'Lookup and validate product information without performing any operations. Takes a product name with advanced fuzzy matching (handles typos, missing accents, partial matches, and similar terms), returns all relevant data including exact IDs, available locations, and current stock levels. Use this BEFORE calling any product operation (consume_product, purchase_product, inventory_product, transfer_product, etc.) to prevent hallucination and get user confirmation.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        productName: {
+          type: 'string',
+          description: 'Name of the product to lookup with advanced fuzzy matching. Handles typos, missing accents, partial names, and similar terms (e.g., "ice cream" matches "Ice Cream", "icecream", "ice crem", "vanila ice", etc.)'
+        }
+      },
+      required: ['productName']
     }
   }
 ];

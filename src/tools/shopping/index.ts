@@ -25,7 +25,7 @@ export const shoppingToolDefinitions = [
         },
         amount: {
           type: 'number',
-          description: 'Amount to add (default: 1)',
+          description: 'Amount to add to shopping list in the product\'s stock unit (e.g., 2 pieces, 1.5 kg, 750 ml). Ensure you know the product\'s unit before specifying amount. Default: 1',
           default: 1
         },
         shoppingListId: {
