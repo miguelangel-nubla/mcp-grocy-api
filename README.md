@@ -1,10 +1,10 @@
 # MCP Grocy API
 
 [![npm version](https://img.shields.io/npm/v/mcp-grocy-api.svg)](https://www.npmjs.com/package/mcp-grocy-api)
-[![Docker Image](https://img.shields.io/badge/docker%20image-ghcr.io-blue)](https://github.com/saya6k/mcp-grocy-api/pkgs/container/mcp-grocy-api)
-[![License](https://img.shields.io/github/license/saya6k/mcp-grocy-api)](LICENSE)
-[![Configuration Status](https://github.com/saya6k/mcp-grocy-api/actions/workflows/validate-config.yml/badge.svg)](https://github.com/saya6k/mcp-grocy-api/actions/workflows/validate-config.yml)
-[![CI/CD Pipeline](https://github.com/saya6k/mcp-grocy-api/actions/workflows/pipeline.yml/badge.svg)](https://github.com/saya6k/mcp-grocy-api/actions/workflows/pipeline.yml)
+[![Docker Image](https://img.shields.io/badge/docker%20image-ghcr.io-blue)](https://github.com/miguelangel-nubla/mcp-grocy-api/pkgs/container/mcp-grocy-api)
+[![License](https://img.shields.io/github/license/miguelangel-nubla/mcp-grocy-api)](LICENSE)
+[![Configuration Status](https://github.com/miguelangel-nubla/mcp-grocy-api/actions/workflows/validate-config.yml/badge.svg)](https://github.com/miguelangel-nubla/mcp-grocy-api/actions/workflows/validate-config.yml)
+[![CI/CD Pipeline](https://github.com/miguelangel-nubla/mcp-grocy-api/actions/workflows/pipeline.yml/badge.svg)](https://github.com/miguelangel-nubla/mcp-grocy-api/actions/workflows/pipeline.yml)
 [![MCP Compatible](https://img.shields.io/badge/MCP-Compatible-blue)](https://modelcontextprotocol.io)
 
 This project is a specialized fork of [mcp-rest-api](https://github.com/dkmaker/mcp-rest-api), refactored to work specifically with Grocy's API.
@@ -14,7 +14,7 @@ This project is a specialized fork of [mcp-rest-api](https://github.com/dkmaker/
 ### NPM
 
 ```bash
-git clone -b main https://github.com/saya6k/mcp-grocy-api.git
+git clone -b main https://github.com/miguelangel-nubla/mcp-grocy-api.git
 cd mcp-grocy-api
 npm install
 npm run build
@@ -23,7 +23,7 @@ npm run build
 ### Docker
 
 ```bash
-docker run -e GROCY_APIKEY_VALUE=your_api_key -e GROCY_BASE_URL=http://your-grocy-instance ghcr.io/saya6k/mcp-grocy-api:latest
+docker run -e GROCY_APIKEY_VALUE=your_api_key -e GROCY_BASE_URL=http://your-grocy-instance ghcr.io/miguelangel-nubla/mcp-grocy-api:latest
 ```
 
 ## Usage

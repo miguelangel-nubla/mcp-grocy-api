@@ -13,7 +13,7 @@ Edit `claude_desktop_config.json`(for Claude Desktop) or `.cursor/mcp.json`(for 
       "command": "npx",
       "args": [
         "-y",
-        "saya6k/mcp-grocy-api"
+        "miguelangel-nubla/mcp-grocy-api"
       ], 
       "env": {
         "GROCY_BASE_URL": "",
@@ -33,11 +33,11 @@ Or you can use Docker:
       "command": "docker",
       "args": [
         "run",
-        "ghcr.io/saya6k/mcp-grocy-api",
+        "ghcr.io/miguelangel-nubla/mcp-grocy-api",
         "tini",
         "--",
         "node",
-        "build/index.js"
+        "build/main.js"
         ],
       "env": {
         "GROCY_BASE_URL": "",
@@ -56,7 +56,7 @@ To install using Node.js, you will need to have Node.js and npm (or yarn) instal
 
 Clone the repository:
 ```bash
-git clone -b main https://github.com/saya6k/mcp-grocy-api.git
+git clone -b main https://github.com/miguelangel-nubla/mcp-grocy-api.git
 cd mcp-grocy-api
 ```
 
@@ -87,13 +87,13 @@ npx -y mcp-grocy-api
 To run using Docker, you first need to build the Docker image:
 
 ```bash
-docker build -t ghcr.io/saya6k/mcp-grocy-api .
+docker build -t ghcr.io/miguelangel-nubla/mcp-grocy-api .
 ```
 
 Then run the container with tini:
 
 ```bash
-docker run -p mcp-grocy-api tini -- node build/index.js
+docker run -p mcp-grocy-api tini -- node build/main.js
 ```
 
 ## HTTP/SSE Transport

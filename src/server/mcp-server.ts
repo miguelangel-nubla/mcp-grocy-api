@@ -81,8 +81,8 @@ export class GrocyMcpServer {
       {
         name: SERVER_NAME,
         version: VERSION,
-        serverUrl: "https://github.com/saya6k/mcp-grocy-api",
-        documentationUrl: "https://github.com/saya6k/mcp-grocy-api/blob/main/README.md"
+        serverUrl: "https://github.com/miguelangel-nubla/mcp-grocy-api",
+        documentationUrl: "https://github.com/miguelangel-nubla/mcp-grocy-api/blob/main/README.md"
       },
       {
         capabilities: {

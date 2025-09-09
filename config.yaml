@@ -27,4 +27,4 @@ ports:
   "8080/tcp": "8080"
 ports_description:
   "8080/tcp": "Streamable HTTP / SSE port"
-image: "ghcr.io/saya6k/hassio-addons/{arch}-addon-mcp-grocy-api" # Version will be appended by build
+image: "ghcr.io/miguelangel-nubla/hassio-addons/{arch}-addon-mcp-grocy-api" # Version will be appended by build

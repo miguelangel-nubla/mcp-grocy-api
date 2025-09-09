@@ -15,5 +15,5 @@ jobs:
       - name: Refresh badges
         uses: b3b00/refreshBadgesAction@v1.0.7
         with:
-          repository: 'saya6k/mcp-grocy-api'
+          repository: 'miguelangel-nubla/mcp-grocy-api'
           branch: 'main'
