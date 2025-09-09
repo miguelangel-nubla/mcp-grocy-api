@@ -1,6 +1,5 @@
 // Template file for TypeScript during development
 // The actual version.ts will be generated during build
-
 export const VERSION = '0.0.0';
 export const PACKAGE_NAME = 'mcp-grocy-api';
 export const SERVER_NAME = 'grocy-api';

@@ -17,10 +17,9 @@ fs.ensureDirSync(buildDir);
 const version = process.env.RELEASE_VERSION || pkg.version;
 console.log(`Using version: ${version}`);
 
-const versionContent = `
-// Auto-generated file - DO NOT MODIFY
+const versionContent = `// Auto-generated file - DO NOT MODIFY
 export const VERSION = '${version}';
-export const PACKAGE_NAME = '${pkg.name.toLowerCase()}'; // Ensure lowercase
+export const PACKAGE_NAME = '${pkg.name.toLowerCase()}';
 export const SERVER_NAME = 'grocy-api';
 `;
 

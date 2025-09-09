@@ -45,9 +45,9 @@ export function startHttpServer(mcpServer: Server | (() => Server), port: number
   const sseTransports: Record<string, SSEServerTransport> = {};
   const sseServerInstances: Record<string, Server> = {};
 
-  // Middleware to log all requests
+  // Simplified request logging
   app.use((req, res, next) => {
-    console.error(`[${new Date().toISOString()}] ${req.method} ${req.path} - Headers: ${JSON.stringify(req.headers)}`);
+    console.error(`[${new Date().toISOString()}] ${req.method} ${req.path}`);
     next();
   });
 
@@ -83,10 +83,7 @@ export function startHttpServer(mcpServer: Server | (() => Server), port: number
 
       if (clientSessionId) {
         transport = streamableTransports[clientSessionId];
-        if (transport) {
-          console.error(`[DEBUG] Using existing transport for session ID: ${clientSessionId}`);
-        } else {
-          console.error(`[ERROR] Invalid or expired session ID provided: ${clientSessionId}. No active transport found.`);
+        if (!transport) {
           res.status(400).json({
             jsonrpc: '2.0',
             error: { code: -32001, message: `Invalid or expired session ID: ${clientSessionId}. Please re-initialize.` },
@@ -95,53 +92,23 @@ export function startHttpServer(mcpServer: Server | (() => Server), port: number
           return;
         }
       } else {
-        // No session ID provided by client, this should be an 'initialize' request or similar.
-        console.error('[DEBUG] No session ID provided by client. Creating new transport.');
-        const newGeneratedSessionId = randomUUID(); // Always generate a fresh ID for a new transport.
+        // No session ID provided by client, create new transport
+        const newGeneratedSessionId = randomUUID();
         
         const newTransportInstance = new StreamableHTTPServerTransport({
-          sessionIdGenerator: () => {
-            // This generator is called by the transport. We want it to use the ID we just generated.
-            console.error(`[DEBUG] StreamableHTTPServerTransport internal sessionIdGenerator using pre-generated ID: ${newGeneratedSessionId}`);
-            return newGeneratedSessionId;
-          },
-          onsessioninitialized: (initializedSid: string) => {
-            console.error(`[DEBUG] Event: StreamableHTTPServerTransport internal session initialized with actual ID: ${initializedSid}.`);
-            if (initializedSid !== newGeneratedSessionId) {
-              console.error(`[CRITICAL_WARNING] Mismatch between generated session ID ${newGeneratedSessionId} and transport's initialized ID ${initializedSid}!`);
-            }
-          }
+          sessionIdGenerator: () => newGeneratedSessionId
         });
         
         transport = newTransportInstance;
-
-        // Verify the transport's public sessionId property matches our generated ID.
-        // This relies on the transport setting its public .sessionId based on its sessionIdGenerator.
-        if (!transport.sessionId || transport.sessionId !== newGeneratedSessionId) {
-           console.error(`[CRITICAL_ERROR] Newly created transport's public sessionId ('${transport.sessionId}') does not match expected new ID ('${newGeneratedSessionId}'). This may indicate an issue with the transport's constructor or sessionId property assignment.`);
-           // If the transport.sessionId is not correctly set by its constructor based on sessionIdGenerator,
-           // session management will fail. We should not try to force it here as it hides an SDK issue.
-        }
-
-        console.error(`[DEBUG] New transport created. Effective session ID: ${transport.sessionId || 'undefined!'}. Registering with ID: ${newGeneratedSessionId}.`);
-        // We must use newGeneratedSessionId as the key, as that's what the transport *should* be using.
         streamableTransports[newGeneratedSessionId] = transport;
 
         transport.onclose = () => {
-          // Use newGeneratedSessionId in closure for safety, or rely on transport.sessionId if consistently set.
           const closedSessionId = transport?.sessionId || newGeneratedSessionId;
-          if (streamableTransports[closedSessionId]) {
-            console.error(`[DEBUG] Transport for session ID: ${closedSessionId} closed. Removing from active transports.`);
-            delete streamableTransports[closedSessionId];
-          } else {
-            console.error(`[DEBUG] Transport for session ID: ${closedSessionId} closed, but was already removed or not found in active transports.`);
-          }
+          delete streamableTransports[closedSessionId];
         };
 
         const serverInstance = getServerInstance();
-        console.error(`[DEBUG] Connecting new transport (intended ID: ${newGeneratedSessionId}, actual transport.sessionId: ${transport.sessionId}) to MCP server`);
-        await serverInstance.connect(transport); 
-        console.error(`[DEBUG] New transport (ID: ${transport.sessionId}) connected successfully`);
+        await serverInstance.connect(transport);
       }
 
       if (!transport) {
@@ -151,10 +118,7 @@ export function startHttpServer(mcpServer: Server | (() => Server), port: number
       }
 
       if (transport.sessionId) {
-        console.error(`[DEBUG] Setting Mcp-Session-Id header to: ${transport.sessionId}`);
         res.setHeader('Mcp-Session-Id', transport.sessionId);
-      } else {
-        console.error(`[WARNING] Transport instance (client sent ID: ${clientSessionId || 'none'}) has no session ID to set in response headers. This is unexpected.`);
       }
       
       await transport.handleRequest(req, res, req.body);
@@ -177,7 +141,7 @@ export function startHttpServer(mcpServer: Server | (() => Server), port: number
   });
 
   // SSE endpoint
-  app.get('/mcp/sse', async (req, res) => {
+  app.get('/mcp/sse', async (_req, res) => {
     try {
       // Set SSE headers before creating transport
       res.setHeader('Content-Type', 'text/event-stream');
