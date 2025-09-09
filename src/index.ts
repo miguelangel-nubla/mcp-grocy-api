@@ -523,7 +523,7 @@ class GrocyApiServer {
         },
         {
           name: 'get_locations',
-          description: 'Get all storage locations from your Grocy instance.',
+          description: 'Get all storage locations from your Grocy instance. Use this to find location IDs and names when working with other tools that require locationId parameters.',
           inputSchema: {
             type: 'object',
             properties: {},
@@ -532,7 +532,7 @@ class GrocyApiServer {
         },
         {
           name: 'get_shopping_locations',
-          description: 'Get all shopping locations (stores) from your Grocy instance.',
+          description: 'Get all shopping locations (stores) from your Grocy instance. Use this to find store IDs and names when working with tools that require storeId parameters.',
           inputSchema: {
             type: 'object',
             properties: {},
@@ -610,13 +610,13 @@ class GrocyApiServer {
         },
         {
           name: 'get_meal_plan',
-          description: 'Get your meal plan data from Grocy instance with corresponding recipe details. Returns planned meals for a specific date including recipe names, descriptions, meal sections, and other details. Use this to find out what recipes/meals are planned for a specific date (e.g., "what\'s for dinner tomorrow", "recipes for today", "meal plan for next week").',
+          description: 'Get your meal plan data from Grocy instance with corresponding recipe details. Returns planned meals for a specific date including recipe names, descriptions, meal sections, and other details. Use this to find out what recipes/meals are planned for a specific date (e.g., "what\'s for dinner tomorrow", "recipes for today", "meal plan for next week"). The returned data includes the id field (meal plan entry ID) which can be used with delete_recipe_from_meal_plan.',
           inputSchema: {
             type: 'object',
             properties: {
               date: {
                 type: 'string',
-                description: 'Date in YYYY-MM-DD format.'
+                description: 'Date in YYYY-MM-DD format (e.g., "2024-12-25"). Use today\'s date or future dates to see planned meals.'
               }
             },
             required: ['date'],
@@ -624,7 +624,7 @@ class GrocyApiServer {
         },
         {
           name: 'get_products',
-          description: 'Get all products from your Grocy instance.',
+          description: 'Get all products from your Grocy instance. Use this to find product IDs and names when working with other tools that require productId parameters.',
           inputSchema: {
             type: 'object',
             properties: {},
@@ -683,13 +683,13 @@ class GrocyApiServer {
         },
         {
           name: 'add_shopping_list_item',
-          description: 'Add an item to your shopping list.',
+          description: 'Add an item to your shopping list. Use get_products first to find the product ID you want to add.',
           inputSchema: {
             type: 'object',
             properties: {
               productId: {
                 type: 'number',
-                description: 'ID of the product to add'
+                description: 'ID of the product to add. Use get_products tool to find the correct product ID by searching for the product name in the results.'
               },
               amount: {
                 type: 'number',
@@ -698,7 +698,7 @@ class GrocyApiServer {
               },
               shoppingListId: {
                 type: 'number',
-                description: 'ID of the shopping list to add to (default: 1)',
+                description: 'ID of the shopping list to add to (default: 1). Most users have only one shopping list with ID 1.',
                 default: 1
               },
               note: {
@@ -727,12 +727,12 @@ class GrocyApiServer {
                 type: 'number',
                 description: 'Number of servings for this meal plan entry (e.g., 2 for a family of two, 4 for a family of four).'
               },
-              section_id: {
+              sectionId: {
                 type: 'number',
                 description: 'ID of the meal plan section that defines when this meal will be consumed (e.g., breakfast, lunch, dinner, snacks). Use get_meal_plan_sections tool to discover what sections are available in your Grocy instance and get their specific IDs and names.'
               }
             },
-            required: ['recipeId', 'day', 'servings', 'section_id'],
+            required: ['recipeId', 'day', 'servings', 'sectionId'],
           },
         },
         {
@@ -746,7 +746,7 @@ class GrocyApiServer {
         },
         {
           name: 'delete_recipe_from_meal_plan',
-          description: 'Delete a specific recipe entry from the meal plan. Use get_meal_plan to find the meal_plan_entry_id of the entry you want to remove.',
+          description: 'Delete a specific recipe entry from the meal plan. Use get_meal_plan to find the mealPlanEntryId of the entry you want to remove.',
           inputSchema: {
             type: 'object',
             properties: {
@@ -754,23 +754,23 @@ class GrocyApiServer {
                 type: 'string',
                 description: 'Date of the meal plan entry in YYYY-MM-DD format (e.g., "2024-12-25").'
               },
-              meal_plan_entry_id: {
+              mealPlanEntryId: {
                 type: 'number',
                 description: 'ID of the specific meal plan entry to delete. Use get_meal_plan to find the correct entry ID.'
               }
             },
-            required: ['date', 'meal_plan_entry_id'],
+            required: ['date', 'mealPlanEntryId'],
           },
         },
         {
           name: 'inventory_product',
-          description: 'Track a product inventory (set current stock amount).',
+          description: 'Track a product inventory (set current stock amount). Use get_products to find the product ID and get_locations to find location IDs.',
           inputSchema: {
             type: 'object',
             properties: {
               productId: {
                 type: 'number',
-                description: 'ID of the product to inventory'
+                description: 'ID of the product to inventory. Use get_products tool to find the correct product ID by name.'
               },
               newAmount: {
                 type: 'number',
@@ -782,7 +782,7 @@ class GrocyApiServer {
               },
               locationId: {
                 type: 'number',
-                description: 'ID of the location (optional)'
+                description: 'ID of the storage location (optional). Use get_locations tool to find available location IDs and names.'
               },
               note: {
                 type: 'string',
@@ -827,13 +827,13 @@ class GrocyApiServer {
         },
         {
           name: 'purchase_product',
-          description: 'Track a product purchase in your Grocy instance.',
+          description: 'Track a product purchase in your Grocy instance. Use get_products to find product IDs, get_shopping_locations for store IDs, and get_locations for storage location IDs.',
           inputSchema: {
             type: 'object',
             properties: {
               productId: {
                 type: 'number',
-                description: 'ID of the product to purchase'
+                description: 'ID of the product to purchase. Use get_products tool to find the correct product ID by name.'
               },
               amount: {
                 type: 'number',
@@ -850,11 +850,11 @@ class GrocyApiServer {
               },
               storeId: {
                 type: 'number',
-                description: 'ID of the store where purchased (optional)'
+                description: 'ID of the store where purchased (optional). Use get_shopping_locations tool to find available store IDs and names.'
               },
               locationId: {
                 type: 'number',
-                description: 'ID of the storage location (optional)'
+                description: 'ID of the storage location (optional). Use get_locations tool to find available location IDs and names.'
               },
               note: {
                 type: 'string',
@@ -866,13 +866,13 @@ class GrocyApiServer {
         },
         {
           name: 'consume_product',
-          description: 'Track consumption of a product in your Grocy instance.',
+          description: 'Track consumption of a product in your Grocy instance. Use get_products to find product IDs, get_recipes for recipe IDs, and get_locations for location IDs.',
           inputSchema: {
             type: 'object',
             properties: {
               productId: {
                 type: 'number',
-                description: 'ID of the product to consume'
+                description: 'ID of the product to consume. Use get_products tool to find the correct product ID by name.'
               },
               amount: {
                 type: 'number',
@@ -886,11 +886,11 @@ class GrocyApiServer {
               },
               recipeId: {
                 type: 'number',
-                description: 'ID of the recipe if consuming for a recipe (optional)'
+                description: 'ID of the recipe if consuming for a recipe (optional). Use get_recipes tool to find recipe IDs by name.'
               },
               locationId: {
                 type: 'number',
-                description: 'ID of the location to consume from (optional)'
+                description: 'ID of the location to consume from (optional). Use get_locations tool to find available location IDs and names.'
               },
               note: {
                 type: 'string',
@@ -902,19 +902,19 @@ class GrocyApiServer {
         },
         {
           name: 'track_chore_execution',
-          description: 'Track execution of a chore in your Grocy instance.',
+          description: 'Track execution of a chore in your Grocy instance. Use get_chores to find chore IDs and get_users to find user IDs.',
           inputSchema: {
             type: 'object',
             properties: {
               choreId: {
                 type: 'number',
-                description: 'ID of the chore that was executed'
+                description: 'ID of the chore that was executed. Use get_chores tool to find the correct chore ID by name.'
               },
               executedBy: {
                 type: 'number',
-                description: 'ID of the user who executed the chore (optional)'
+                description: 'ID of the user who executed the chore (optional). Use get_users tool to find available user IDs and names.'
               },
-              tracked_time: {
+              trackedTime: {
                 type: 'string',
                 description: 'When the chore was executed in YYYY-MM-DD HH:MM:SS format (default: now)'
               },
@@ -928,13 +928,13 @@ class GrocyApiServer {
         },
         {
           name: 'complete_task',
-          description: 'Mark a task as completed in your Grocy instance.',
+          description: 'Mark a task as completed in your Grocy instance. Use get_tasks first to find the task ID.',
           inputSchema: {
             type: 'object',
             properties: {
               taskId: {
                 type: 'number',
-                description: 'ID of the task to complete'
+                description: 'ID of the task to complete. Use get_tasks tool to find the correct task ID by name or description.'
               },
               note: {
                 type: 'string',
@@ -946,13 +946,13 @@ class GrocyApiServer {
         },
         {
           name: 'transfer_product',
-          description: 'Transfer a product from one location to another in your Grocy instance.',
+          description: 'Transfer a product from one location to another in your Grocy instance. Use get_products to find product IDs and get_locations to find location IDs.',
           inputSchema: {
             type: 'object',
             properties: {
               productId: {
                 type: 'number',
-                description: 'ID of the product to transfer'
+                description: 'ID of the product to transfer. Use get_products tool to find the correct product ID by name.'
               },
               amount: {
                 type: 'number',
@@ -961,11 +961,11 @@ class GrocyApiServer {
               },
               locationIdFrom: {
                 type: 'number',
-                description: 'ID of the source location (required)'
+                description: 'ID of the source location (required). Use get_locations tool to find available location IDs and names.'
               },
               locationIdTo: {
                 type: 'number', 
-                description: 'ID of the destination location (required)'
+                description: 'ID of the destination location (required). Use get_locations tool to find available location IDs and names.'
               },
               note: {
                 type: 'string',
@@ -977,13 +977,13 @@ class GrocyApiServer {
         },
         {
           name: 'get_price_history',
-          description: 'Get the price history of a product from your Grocy instance.',
+          description: 'Get the price history of a product from your Grocy instance. Use get_products first to find the product ID.',
           inputSchema: {
             type: 'object',
             properties: {
               productId: {
                 type: 'number',
-                description: 'ID of the product to get price history for'
+                description: 'ID of the product to get price history for. Use get_products tool to find the correct product ID by name.'
               }
             },
             required: ['productId'],
@@ -991,17 +991,17 @@ class GrocyApiServer {
         },
         {
           name: 'open_product',
-          description: 'Mark a product as opened in your Grocy instance.',
+          description: 'Mark a product as opened in your Grocy instance. Use get_products to find product IDs or get_product_entries for specific stock entry IDs.',
           inputSchema: {
             type: 'object',
             properties: {
               productId: {
                 type: 'number',
-                description: 'ID of the product to mark as opened (alternative to stockEntryId)'
+                description: 'ID of the product to mark as opened (alternative to stockEntryId). Use get_products tool to find the correct product ID by name.'
               },
               stockEntryId: {
                 type: 'number',
-                description: 'ID of the specific stock entry to mark as opened (more precise than productId)'
+                description: 'ID of the specific stock entry to mark as opened (more precise than productId). Use get_product_entries tool to find specific stock entries for a product.'
               },
               amount: {
                 type: 'number',
@@ -1017,13 +1017,13 @@ class GrocyApiServer {
         },
         {
           name: 'get_stock_by_location',
-          description: 'Get all stock from a specific location in your Grocy instance.',
+          description: 'Get all stock from a specific location in your Grocy instance. Use get_locations first to find the location ID.',
           inputSchema: {
             type: 'object',
             properties: {
               locationId: {
                 type: 'number',
-                description: 'ID of the location to get stock for'
+                description: 'ID of the location to get stock for. Use get_locations tool to find available location IDs and names.'
               }
             },
             required: ['locationId'],
@@ -1031,13 +1031,13 @@ class GrocyApiServer {
         },
         {
           name: 'consume_recipe',
-          description: 'Consume all ingredients needed for a recipe in your Grocy instance.',
+          description: 'Consume all ingredients needed for a recipe in your Grocy instance. Use get_recipes first to find the recipe ID.',
           inputSchema: {
             type: 'object',
             properties: {
               recipeId: {
                 type: 'number',
-                description: 'ID of the recipe to consume'
+                description: 'ID of the recipe to consume. Use get_recipes tool to find the correct recipe ID by name.'
               },
               servings: {
                 type: 'number',
@@ -1050,13 +1050,13 @@ class GrocyApiServer {
         },
         {
           name: 'charge_battery',
-          description: 'Track charging of a battery in your Grocy instance.',
+          description: 'Track charging of a battery in your Grocy instance. Use get_batteries first to find the battery ID.',
           inputSchema: {
             type: 'object',
             properties: {
               batteryId: {
                 type: 'number',
-                description: 'ID of the battery that was charged'
+                description: 'ID of the battery that was charged. Use get_batteries tool to find the correct battery ID by name.'
               },
               trackedTime: {
                 type: 'string',
@@ -1072,13 +1072,13 @@ class GrocyApiServer {
         },
         {
           name: 'add_missing_products_to_shopping_list',
-          description: 'Add all missing products for a recipe to your shopping list.',
+          description: 'Add all missing products for a recipe to your shopping list. Use get_recipes first to find the recipe ID.',
           inputSchema: {
             type: 'object',
             properties: {
               recipeId: {
                 type: 'number',
-                description: 'ID of the recipe to add missing products for'
+                description: 'ID of the recipe to add missing products for. Use get_recipes tool to find the correct recipe ID by name.'
               },
               servings: {
                 type: 'number',
@@ -1087,7 +1087,7 @@ class GrocyApiServer {
               },
               shoppingListId: {
                 type: 'number',
-                description: 'ID of the shopping list to add to (default: 1)',
+                description: 'ID of the shopping list to add to (default: 1). Most users have only one shopping list with ID 1.',
                 default: 1
               }
             },
@@ -1096,13 +1096,13 @@ class GrocyApiServer {
         },
         {
           name: 'get_recipe_fulfillment',
-          description: 'Get stock fulfillment information for a recipe.',
+          description: 'Get stock fulfillment information for a recipe. Use get_recipes first to find the recipe ID.',
           inputSchema: {
             type: 'object',
             properties: {
               recipeId: {
                 type: 'number',
-                description: 'ID of the recipe to check fulfillment for'
+                description: 'ID of the recipe to check fulfillment for. Use get_recipes tool to find the correct recipe ID by name.'
               },
               servings: {
                 type: 'number',
@@ -1115,13 +1115,13 @@ class GrocyApiServer {
         },
         {
           name: 'remove_shopping_list_item',
-          description: 'Remove an item from your shopping list.',
+          description: 'Remove an item from your shopping list. Use get_shopping_list first to find the shopping list item ID.',
           inputSchema: {
             type: 'object',
             properties: {
               shoppingListItemId: {
                 type: 'number',
-                description: 'ID of the shopping list item to remove'
+                description: 'ID of the shopping list item to remove. Use get_shopping_list tool to find the correct shopping list item ID by looking at the "id" field in the results.'
               }
             },
             required: ['shoppingListItemId'],
@@ -1187,13 +1187,13 @@ class GrocyApiServer {
         },
         {
           name: 'get_product_entries',
-          description: 'Get all stock entries for a specific product in your Grocy instance.',
+          description: 'Get all stock entries for a specific product in your Grocy instance. Use get_products first to find the product ID.',
           inputSchema: {
             type: 'object',
             properties: {
               productId: {
                 type: 'number',
-                description: 'ID of the product to get stock entries for'
+                description: 'ID of the product to get stock entries for. Use get_products tool to find the correct product ID by name.'
               }
             },
             required: ['productId'],
@@ -1291,7 +1291,7 @@ class GrocyApiServer {
             body: shoppingListItemData
           });
         case 'add_recipe_to_meal_plan':
-          const { recipeId: mealPlanRecipeId, day, servings: mealPlanServings, section_id } = request.params.arguments || {};
+          const { recipeId: mealPlanRecipeId, day, servings: mealPlanServings, sectionId } = request.params.arguments || {};
           if (!mealPlanRecipeId) {
             throw new McpError(ErrorCode.InvalidParams, 'recipeId is required. Use get_recipes tool to find valid recipe IDs.');
           }
@@ -1301,14 +1301,14 @@ class GrocyApiServer {
           if (!mealPlanServings) {
             throw new McpError(ErrorCode.InvalidParams, 'servings is required. Specify how many servings to plan for this meal (e.g., 2, 4).');
           }
-          if (!section_id) {
-            throw new McpError(ErrorCode.InvalidParams, 'section_id is required. Use get_meal_plan_sections tool to find valid section IDs and their names.');
+          if (!sectionId) {
+            throw new McpError(ErrorCode.InvalidParams, 'sectionId is required. Use get_meal_plan_sections tool to find valid section IDs and their names.');
           }
           const mealPlanData = {
             day: day,
             recipe_id: mealPlanRecipeId,
             recipe_servings: mealPlanServings,
-            section_id: section_id,
+            section_id: sectionId,
             type: "recipe" // Add the type field to specify this is a recipe entry
           };
           return await this.handleGrocyApiCall('/objects/meal_plan', 'Add recipe to meal plan', {
@@ -1316,14 +1316,14 @@ class GrocyApiServer {
             body: mealPlanData
           });
         case 'delete_recipe_from_meal_plan':
-          const { date: deleteMealDate, meal_plan_entry_id } = request.params.arguments || {};
+          const { date: deleteMealDate, mealPlanEntryId } = request.params.arguments || {};
           if (!deleteMealDate) {
             throw new McpError(ErrorCode.InvalidParams, 'date is required. Specify the date in YYYY-MM-DD format (e.g., "2024-12-25").');
           }
-          if (!meal_plan_entry_id) {
-            throw new McpError(ErrorCode.InvalidParams, 'meal_plan_entry_id is required. Use get_meal_plan to find the correct entry ID.');
+          if (!mealPlanEntryId) {
+            throw new McpError(ErrorCode.InvalidParams, 'mealPlanEntryId is required. Use get_meal_plan to find the correct entry ID.');
           }
-          return await this.handleGrocyApiCall(`/objects/meal_plan/${meal_plan_entry_id}`, 'Delete recipe from meal plan', {
+          return await this.handleGrocyApiCall(`/objects/meal_plan/${mealPlanEntryId}`, 'Delete recipe from meal plan', {
             method: 'DELETE'
           });
         case 'inventory_product':
@@ -1439,7 +1439,7 @@ class GrocyApiServer {
             body: consumeData
           });
         case 'track_chore_execution':
-          const { choreId, executedBy, tracked_time, note: choreNote } = request.params.arguments || {};
+          const { choreId, executedBy, trackedTime: choreTrackedTime, note: choreNote } = request.params.arguments || {};
           if (!choreId) {
             throw new McpError(ErrorCode.InvalidParams, 'choreId is required');
           }
@@ -1449,7 +1449,7 @@ class GrocyApiServer {
           console.error(`Executing chore with URL: ${executeUrl}`); // Using stderr instead of stdout
           
           const choreData = {
-            tracked_time: tracked_time || choreTimestamp,
+            tracked_time: choreTrackedTime || choreTimestamp,
             ...(executedBy ? { done_by: executedBy } : {}),
             ...(choreNote ? { note: choreNote } : {})
           };
@@ -1540,7 +1540,7 @@ class GrocyApiServer {
             body: consumeRecipeData
           });
         case 'charge_battery':
-          const { batteryId, trackedTime, note: batteryNote } = request.params.arguments || {};
+          const { batteryId, trackedTime: batteryTrackedTime, note: batteryNote } = request.params.arguments || {};
           if (!batteryId) {
             throw new McpError(ErrorCode.InvalidParams, 'batteryId is required');
           }
@@ -1554,7 +1554,7 @@ class GrocyApiServer {
                 endpoint: `batteries/${batteryId}/charge`,
                 method: 'POST',
                 body: {
-                  tracked_time: trackedTime || batteryTimestamp,
+                  tracked_time: batteryTrackedTime || batteryTimestamp,
                   ...(batteryNote ? { note: batteryNote } : {})
                 }
               }
