@@ -73,3 +73,6 @@ EXPOSE ${DEFAULT_PORT}
 # For Home Assistant addon builds, the entrypoint is /init (from S6-Overlay in the base image).
 # CMD is also typically handled by S6 services defined in rootfs.
 # By not specifying ENTRYPOINT or CMD here, we rely on the base image's defaults when built as an addon.
+
+# For regular Docker builds, set default command
+CMD ["tini", "--", "node", "build/main.js"]
