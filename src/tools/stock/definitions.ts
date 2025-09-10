@@ -58,14 +58,14 @@ export const stockToolDefinitions: ToolDefinition[] = [
         },
         locationId: {
           type: 'number',
-          description: 'ID of the storage location (optional). Use get_locations tool to find available location IDs and names.'
+          description: 'ID of the storage location. Use get_locations tool to find available location IDs and names.'
         },
         note: {
           type: 'string',
           description: 'Optional note'
         }
       },
-      required: ['productId', 'newAmount']
+      required: ['productId', 'newAmount', 'locationId']
     }
   },
   {
@@ -80,8 +80,7 @@ export const stockToolDefinitions: ToolDefinition[] = [
         },
         amount: {
           type: 'number',
-          description: 'Amount to purchase in the product\'s stock unit (e.g., 1 piece, 2.5 kg, 500 ml). Ensure you know the product\'s stock unit before specifying amount. Default: 1',
-          default: 1
+          description: 'Amount to purchase in the product\'s stock unit (e.g., 1 piece, 2.5 kg, 500 ml). Ensure you know the product\'s stock unit before specifying amount.'
         },
         bestBeforeDate: {
           type: 'string',
@@ -97,14 +96,14 @@ export const stockToolDefinitions: ToolDefinition[] = [
         },
         locationId: {
           type: 'number',
-          description: 'ID of the storage location (optional). Use get_locations tool to find available location IDs and names.'
+          description: 'ID of the storage location. Use get_locations tool to find available location IDs and names.'
         },
         note: {
           type: 'string',
           description: 'Optional note'
         }
       },
-      required: ['productId']
+      required: ['productId', 'amount', 'locationId']
     }
   },
   {
@@ -119,8 +118,7 @@ export const stockToolDefinitions: ToolDefinition[] = [
         },
         amount: {
           type: 'number',
-          description: 'Amount to consume in the product\'s stock unit (e.g., 1 piece, 0.5 kg, 250 ml). Ensure you know the product\'s stock unit before specifying amount. Default: 1',
-          default: 1
+          description: 'Amount to consume in the product\'s stock unit (e.g., 1 piece, 0.5 kg, 250 ml). Ensure you know the product\'s stock unit before specifying amount.'
         },
         spoiled: {
           type: 'boolean',
@@ -133,14 +131,14 @@ export const stockToolDefinitions: ToolDefinition[] = [
         },
         locationId: {
           type: 'number',
-          description: 'ID of the location to consume from (optional). Use get_locations tool to find available location IDs and names.'
+          description: 'ID of the location to consume from. Use get_locations tool to find available location IDs and names.'
         },
         note: {
           type: 'string',
           description: 'Optional note'
         }
       },
-      required: ['productId']
+      required: ['productId', 'amount', 'locationId']
     }
   },
   {
@@ -155,23 +153,22 @@ export const stockToolDefinitions: ToolDefinition[] = [
         },
         amount: {
           type: 'number',
-          description: 'Amount to transfer in the product\'s stock unit (e.g., 1 piece, 0.5 kg, 250 ml). Ensure you know the product\'s stock unit before specifying amount. Default: 1',
-          default: 1
+          description: 'Amount to transfer in the product\'s stock unit (e.g., 1 piece, 0.5 kg, 250 ml). Ensure you know the product\'s stock unit before specifying amount.'
         },
         locationIdFrom: {
           type: 'number',
-          description: 'ID of the source location (required). Use get_locations tool to find available location IDs and names.'
+          description: 'ID of the source location. Use get_locations tool to find available location IDs and names.'
         },
         locationIdTo: {
           type: 'number', 
-          description: 'ID of the destination location (required). Use get_locations tool to find available location IDs and names.'
+          description: 'ID of the destination location. Use get_locations tool to find available location IDs and names.'
         },
         note: {
           type: 'string',
           description: 'Optional note for this transfer'
         }
       },
-      required: ['productId', 'locationIdFrom', 'locationIdTo']
+      required: ['productId', 'amount', 'locationIdFrom', 'locationIdTo']
     }
   },
   {
@@ -190,15 +187,14 @@ export const stockToolDefinitions: ToolDefinition[] = [
         },
         amount: {
           type: 'number',
-          description: 'Amount to mark as opened in the product\'s stock unit (e.g., 1 piece, 0.5 kg, 200 ml). Ensure you know the product\'s stock unit before specifying amount. Default: 1',
-          default: 1
+          description: 'Amount to mark as opened in the product\'s stock unit (e.g., 1 piece, 0.5 kg, 200 ml). Ensure you know the product\'s stock unit before specifying amount.'
         },
         note: {
           type: 'string',
           description: 'Optional note'
         }
       },
-      required: []
+      required: ['amount']
     }
   },
   {

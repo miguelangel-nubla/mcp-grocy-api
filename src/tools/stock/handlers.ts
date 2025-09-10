@@ -300,12 +300,20 @@ export class StockToolHandlers extends BaseToolHandler {
           ? { id: unit.id, name: unit.name }
           : { id: null, name: 'pieces' };
 
+        const hasMultipleLocations = stockEntries.length > 1 && 
+          new Set(stockEntries.map((entry: any) => entry.locationId)).size > 1;
+
+        const locationInstructions = hasMultipleLocations 
+          ? 'IMPORTANT: This product has stock in multiple locations. Make sure the user requested a specific location or confirm the locationId before performing any operations.'
+          : undefined;
+
         return {
           productId: product.id,
           productName: product.name,
           stockEntries: stockEntries,
           totalStockAmount: productEntries.reduce((sum: number, s: any) => sum + parseFloat(s.amount || 0), 0),
-          unit: unitInfo
+          unit: unitInfo,
+          locationInstructions
         };
       }));
 
