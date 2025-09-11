@@ -2,8 +2,8 @@ import { ToolDefinition } from '../types.js';
 
 export const stockToolDefinitions: ToolDefinition[] = [
   {
-    name: 'get_stock',
-    description: 'Get current stock from your Grocy instance.',
+    name: 'get_all_stock',
+    description: 'Get all stock entries from every location in your Grocy instance. This returns the complete stock database with detailed information including stock entry IDs.',
     inputSchema: {
       type: 'object',
       properties: {},
@@ -26,13 +26,13 @@ export const stockToolDefinitions: ToolDefinition[] = [
   },
   {
     name: 'get_stock_by_location',
-    description: 'Get all stock from a specific location in your Grocy instance. Use get_locations first to find the location ID.',
+    description: 'Get stock entries from a specific location in your Grocy instance.',
     inputSchema: {
       type: 'object',
       properties: {
         locationId: {
           type: 'number',
-          description: 'ID of the location to get stock for. Use get_locations tool to find available location IDs and names.'
+          description: 'ID of the location to get stock for.'
         }
       },
       required: ['locationId']
@@ -108,13 +108,13 @@ export const stockToolDefinitions: ToolDefinition[] = [
   },
   {
     name: 'consume_product',
-    description: 'Track consumption of a product in your Grocy instance. Use get_products to find product IDs, get_recipes for recipe IDs, and get_locations for location IDs.',
+    description: 'Track consumption of a specific stock entry in your Grocy instance.',
     inputSchema: {
       type: 'object',
       properties: {
-        productId: {
+        stockEntryId: {
           type: 'number',
-          description: 'ID of the product to consume. Use get_products tool to find the correct product ID by name.'
+          description: 'ID of the specific stock entry to consume.'
         },
         amount: {
           type: 'number',
@@ -125,65 +125,49 @@ export const stockToolDefinitions: ToolDefinition[] = [
           description: 'Whether the product is spoiled (default: false)',
           default: false
         },
-        recipeId: {
-          type: 'number',
-          description: 'ID of the recipe if consuming for a recipe (optional). Use get_recipes tool to find recipe IDs by name.'
-        },
-        locationId: {
-          type: 'number',
-          description: 'ID of the location to consume from. Use get_locations tool to find available location IDs and names.'
-        },
         note: {
           type: 'string',
           description: 'Optional note'
         }
       },
-      required: ['productId', 'amount', 'locationId']
+      required: ['stockEntryId', 'amount']
     }
   },
   {
     name: 'transfer_product',
-    description: 'Transfer a product from one location to another in your Grocy instance. Use get_products to find product IDs and get_locations to find location IDs.',
+    description: 'Transfer a specific stock entry to another location in your Grocy instance.',
     inputSchema: {
       type: 'object',
       properties: {
-        productId: {
+        stockEntryId: {
           type: 'number',
-          description: 'ID of the product to transfer. Use get_products tool to find the correct product ID by name.'
+          description: 'ID of the specific stock entry to transfer.'
         },
         amount: {
           type: 'number',
           description: 'Amount to transfer in the product\'s stock unit (e.g., 1 piece, 0.5 kg, 250 ml). Ensure you know the product\'s stock unit before specifying amount.'
         },
-        locationIdFrom: {
-          type: 'number',
-          description: 'ID of the source location. Use get_locations tool to find available location IDs and names.'
-        },
         locationIdTo: {
           type: 'number', 
-          description: 'ID of the destination location. Use get_locations tool to find available location IDs and names.'
+          description: 'ID of the destination location.'
         },
         note: {
           type: 'string',
           description: 'Optional note for this transfer'
         }
       },
-      required: ['productId', 'amount', 'locationIdFrom', 'locationIdTo']
+      required: ['stockEntryId', 'amount', 'locationIdTo']
     }
   },
   {
     name: 'open_product',
-    description: 'Mark a product as opened in your Grocy instance. Use get_products to find product IDs or get_product_entries for specific stock entry IDs.',
+    description: 'Mark a specific stock entry as opened in your Grocy instance.',
     inputSchema: {
       type: 'object',
       properties: {
-        productId: {
-          type: 'number',
-          description: 'ID of the product to mark as opened (alternative to stockEntryId). Use get_products tool to find the correct product ID by name.'
-        },
         stockEntryId: {
           type: 'number',
-          description: 'ID of the specific stock entry to mark as opened (more precise than productId). Use get_product_entries tool to find specific stock entries for a product.'
+          description: 'ID of the specific stock entry to mark as opened.'
         },
         amount: {
           type: 'number',
@@ -194,21 +178,35 @@ export const stockToolDefinitions: ToolDefinition[] = [
           description: 'Optional note'
         }
       },
-      required: ['amount']
+      required: ['stockEntryId', 'amount']
     }
   },
   {
     name: 'lookup_product',
-    description: 'Lookup and validate product information without performing any operations. Takes a product name with advanced fuzzy matching (handles typos, missing accents, partial matches, and similar terms), returns all relevant data including exact IDs, available locations, and current stock levels. Use this BEFORE calling any product operation (consume_product, purchase_product, inventory_product, transfer_product, etc.) to prevent hallucination and get user confirmation.',
+    description: 'Lookup product information with advanced fuzzy matching. Returns all relevant data including exact IDs, available locations, and stock entries.',
     inputSchema: {
       type: 'object',
       properties: {
         productName: {
           type: 'string',
-          description: 'Name of the product to lookup with advanced fuzzy matching. Handles typos, missing accents, partial names, and similar terms (e.g., "ice cream" matches "Ice Cream", "icecream", "ice crem", "vanila ice", etc.)'
+          description: 'Name of the product to lookup.'
         }
       },
       required: ['productName']
+    }
+  },
+  {
+    name: 'print_stock_entry_label',
+    description: 'Print a label for a specific stock entry.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        stockEntryId: {
+          type: 'number',
+          description: 'ID of the stock entry to print label for.'
+        }
+      },
+      required: ['stockEntryId']
     }
   }
 ];

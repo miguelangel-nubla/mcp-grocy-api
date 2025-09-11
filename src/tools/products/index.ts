@@ -6,7 +6,7 @@ export const productModule: ToolModule = {
   definitions: productToolDefinitions,
   handlers: {
     get_products: productHandlers.getProducts,
-    get_product_entries: productHandlers.getProductEntries,
+    get_stock_by_product: productHandlers.getStockByProduct,
     get_price_history: productHandlers.getPriceHistory,
     get_product_groups: productHandlers.getProductGroups
   }

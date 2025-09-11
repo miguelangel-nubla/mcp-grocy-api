@@ -150,5 +150,24 @@ export const recipeToolDefinitions: ToolDefinition[] = [
       },
       required: ['recipeId']
     }
+  },
+  {
+    name: 'mark_recipe_from_meal_plan_entry_as_cooked',
+    description: 'Mark a recipe as cooked by finding its undone meal plan entry, marking it as done, consuming all ingredients and printing labels for any stock entries created.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        recipeId: {
+          type: 'number',
+          description: 'ID of the recipe to mark as cooked. Use get_recipes tool to find the correct recipe ID by name.'
+        },
+        servings: {
+          type: 'number',
+          description: 'Number of servings to consume (default: 1)',
+          default: 1
+        }
+      },
+      required: ['recipeId', 'servings']
+    }
   }
 ];

@@ -37,3 +37,4 @@ mcp-config.local.json
 # Temporary files
 *.tmp
 .cache/
+cmdrun

@@ -31,13 +31,40 @@ export class ProductToolHandlers extends BaseToolHandler {
     return this.createSuccessResult(filteredData);
   };
 
-  public getProductEntries: ToolHandler = async (args: any): Promise<ToolResult> => {
+  public getStockByProduct: ToolHandler = async (args: any): Promise<ToolResult> => {
     const { productId } = args || {};
     if (!productId) {
       throw new McpError(ErrorCode.InvalidParams, 'productId is required');
     }
     
-    return this.handleApiCall(`/stock/products/${productId}/entries`, 'Get product entries');
+    const result = await this.handleApiCall(`/stock/products/${productId}/entries`, 'Get stock by product');
+    
+    if (result.isError || !result.content) {
+      return result;
+    }
+
+    // Define the fields we want to keep for each stock entry
+    const entryFields = [
+      'id',
+      'amount',
+      'best_before_date',
+      'purchased_date',
+      'stock_id',
+      'note'
+    ];
+    
+    // Filter entries to only include essential fields
+    const filteredEntries = Array.isArray(result.content) 
+      ? result.content.map((entry: any) => {
+          const filteredEntry = entryFields.reduce((filtered: any, field: string) => {
+            filtered[field] = entry[field];
+            return filtered;
+          }, {});
+          return filteredEntry;
+        })
+      : result.content;
+
+    return this.createSuccessResult(filteredEntries);
   };
 
   public getPriceHistory: ToolHandler = async (args: any): Promise<ToolResult> => {

@@ -130,6 +130,90 @@ export class RecipeToolHandlers extends BaseToolHandler {
       body
     });
   };
+
+  public markRecipeFromMealPlanEntryAsCooked: ToolHandler = async (args: any): Promise<ToolResult> => {
+    const { recipeId, servings } = args || {};
+    
+    if (!recipeId) {
+      throw new McpError(ErrorCode.InvalidParams, 'recipeId is required. Use get_recipes tool to find recipe IDs.');
+    }
+    
+    if (!servings) {
+      throw new McpError(ErrorCode.InvalidParams, 'servings is required. Specify the number of servings to consume.');
+    }
+
+    try {
+      // First, find matching meal plan entry starting from yesterday that is not yet done
+      const yesterday = new Date();
+      yesterday.setDate(yesterday.getDate() - 1);
+      const yesterdayStr = yesterday.toISOString().split('T')[0];
+      let mealPlanEntry: any = null;
+      let mealPlanMarked = false;
+
+      // Get meal plan entries starting from yesterday
+      const mealPlanResponse = await apiClient.get('/objects/meal_plan', {
+        queryParams: { 'query[]': `day>=${yesterdayStr}`, limit: '100' }
+      });
+      
+      const mealPlanData = Array.isArray(mealPlanResponse.data) ? mealPlanResponse.data : [];
+      
+      // Find entry for this recipe that's not done yet (starting from yesterday)
+      mealPlanEntry = mealPlanData.find((entry: any) => 
+        entry.recipe_id == recipeId && entry.done == 0
+      );
+
+      if (!mealPlanEntry) {
+        return this.createErrorResult(
+          `No undone meal plan entry found for recipe ${recipeId} starting from yesterday (${yesterdayStr}). Recipe must be planned in meal plan before marking as cooked.`,
+          { recipeId, searchFrom: yesterdayStr, availableEntries: mealPlanData.filter(e => e.recipe_id == recipeId) }
+        );
+      }
+
+      // Mark the meal plan entry as done
+      await apiClient.put(`/objects/meal_plan/${mealPlanEntry.id}`, {
+        body: { ...mealPlanEntry, done: 1 }
+      });
+      mealPlanMarked = true;
+
+      // Consume the recipe ingredients
+      const consumeResult = await this.handleApiCall(`/recipes/${recipeId}/consume`, 'Consume recipe ingredients', {
+        method: 'POST',
+        body: { servings }
+      });
+
+      if (consumeResult.isError) {
+        return consumeResult;
+      }
+
+      // Try to print label for the created stock entry (best effort)
+      let labelPrinted = false;
+      
+      const recipeResponse = await apiClient.get(`/objects/recipes/${recipeId}`);
+      const recipe = recipeResponse.data;
+      
+      if (recipe && recipe.product_id) {
+        const entriesResponse = await apiClient.get(`/stock/products/${recipe.product_id}/entries`);
+        const entries = Array.isArray(entriesResponse.data) ? entriesResponse.data : [];
+        
+        if (entries.length > 0) {
+          const recentEntry = entries[0];
+          await apiClient.get(`/stock/entry/${recentEntry.stock_id}/printlabel`);
+          labelPrinted = true;
+        }
+      }
+
+      return this.createSuccessResult({
+        message: `Recipe ${recipeId} marked as cooked (${servings} servings consumed), meal plan entry marked as done${labelPrinted ? ' and label printed' : ''}`,
+        recipeId,
+        servings,
+        mealPlanEntry: mealPlanEntry ? { id: mealPlanEntry.id, day: mealPlanEntry.day, marked: mealPlanMarked } : null,
+        consumptionResult: consumeResult.content
+      });
+
+    } catch (error: any) {
+      return this.createErrorResult(`Failed to mark recipe as cooked: ${error.message}`, { recipeId, servings });
+    }
+  };
 }
 
 export const recipeHandlers = new RecipeToolHandlers();

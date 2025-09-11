@@ -20,8 +20,8 @@ export const productToolDefinitions: ToolDefinition[] = [
     }
   },
   {
-    name: 'get_product_entries',
-    description: 'Get all stock entries for a specific product in your Grocy instance. Use get_products first to find the product ID.',
+    name: 'get_stock_by_product',
+    description: 'Get stock entries for a specific product in your Grocy instance with filtered essential information.',
     inputSchema: {
       type: 'object',
       properties: {
@@ -35,7 +35,7 @@ export const productToolDefinitions: ToolDefinition[] = [
   },
   {
     name: 'get_price_history',
-    description: 'Get the price history of a product from your Grocy instance. Use get_products first to find the product ID.',
+    description: 'Get the price history of a product from your Grocy instance.',
     inputSchema: {
       type: 'object',
       properties: {
