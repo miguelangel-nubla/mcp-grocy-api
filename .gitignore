@@ -8,7 +8,7 @@ src/version.ts
 # package.json should always be tracked
 
 # Docker test builds
-mcp-grocy-api:test
+mcp-grocy:test
 
 # Local environment variables
 .env

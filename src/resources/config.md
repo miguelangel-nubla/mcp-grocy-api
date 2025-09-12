@@ -1,149 +1,282 @@
-# Grocy API MCP Configuration
+# MCP Grocy Configuration Guide
 
-This document describes all available configuration options for the Grocy API MCP server.
+Advanced configuration reference for the MCP Grocy server. For basic setup, see the [README](../../README.md).
 
-## Core Configuration
+## 🔧 Configuration Variables
 
-### GROCY_BASE_URL (Required)
-- Description: The base URL for your Grocy instance.
-- Example: `http://localhost:9283` or `https://my.grocy.server.com`
-- Usage: All API endpoint paths will be appended to this URL.
+### Core Variables
 
-### REST_RESPONSE_SIZE_LIMIT (Optional)
-- Description: Maximum size in bytes for API response data.
-- Default: 10000 (10KB)
-- Example: `50000` for 50KB limit.
-- Usage: Helps prevent memory issues with large responses. If a response exceeds this size, it will be truncated.
+| Variable | Description | Default | Required |
+|----------|-------------|---------|----------|
+| `GROCY_BASE_URL` | Your Grocy instance URL | `http://localhost:9283` | ✅ |
+| `GROCY_APIKEY_VALUE` | Your Grocy API key | - | ✅ |
 
-### GROCY_ENABLE_SSL_VERIFY (Optional)
-- Description: Controls SSL certificate verification for the Grocy API.
-- Default: `true`
-- Values: Set to `false` to disable SSL verification (e.g., for self-signed certificates).
-- Usage: Disable when testing Grocy instances with self-signed certificates in development environments.
+### Optional Variables
 
-### ENABLE_HTTP_SERVER (Optional)
-- Description: Enable Streamable HTTP server in MCP-Grocy-API
-- Default: `false`
-- Values: Set to `true` to enable Streamable http server.
-- Usage: Enable when to usehttp server 
+| Variable | Description | Default | Example |
+|----------|-------------|---------|---------|
+| `GROCY_ENABLE_SSL_VERIFY` | SSL certificate verification | `true` | `false` |
+| `REST_RESPONSE_SIZE_LIMIT` | Response size limit (bytes) | `10000` | `50000` |
 
-### HTTP_SERVER_PORT (Optional)
-- Description: The port for the Streamable HTTP/SSE server.
-- Default: `8080`
-- Example: `HTTP_SERVER_PORT=8080`
-- Usage: Set this to change the port the HTTP/SSE server listens on. Must match the port exposed in Docker or your deployment config.
+## 🌐 HTTP Server Configuration
 
-## Tool Access Control
+Enable HTTP/SSE transport for web-based access:
 
-You can limit which tools are available to the LLM for enhanced security and control.
+| Variable | Description | Default | Example |
+|----------|-------------|---------|---------|
+| `ENABLE_HTTP_SERVER` | Enable HTTP/SSE transport | `false` | `true` |
+| `HTTP_SERVER_PORT` | HTTP server port | `8080` | `3000` |
 
-### ALLOWED_TOOLS (Optional)
-- Description: Comma-separated list of tools that are allowed to be used.
-- Default: All tools are available if not specified.
-- Example: `ALLOWED_TOOLS="get_recipes,get_meal_plan,add_recipe_to_meal_plan"`
-- Usage: When set, only the specified tools will be available. All other tools will be hidden and blocked.
+### Transport Modes
+- **stdio** (default) - Standard MCP protocol for CLI/desktop clients
+- **HTTP** - Streamable HTTP for web applications (`POST /mcp`)
+- **SSE** - Server-Sent Events for real-time web clients (`GET /mcp/sse`)
 
-### BLOCKED_TOOLS (Optional)
-- Description: Comma-separated list of tools that should be blocked/unavailable.
-- Default: No tools are blocked if not specified.
-- Example: `BLOCKED_TOOLS="create_recipe,call_grocy_api,test_request"`
-- Usage: When set, the specified tools will be unavailable. Can be used together with ALLOWED_TOOLS (blocked tools take precedence).
+## 🛠️ Tool Configuration
 
-### Tool Filtering Logic
-- If `ALLOWED_TOOLS` is set: Only tools in the allow list are available
-- If `BLOCKED_TOOLS` is set: Tools in the block list are removed from available tools
-- If both are set: Allow list is applied first, then block list is applied (block list takes precedence)
-- If neither is set: All tools are available
+### Tool Toggle System
 
-### Validation
-- **Invalid tool names**: The server will exit with an error if any tool name in `ALLOWED_TOOLS` or `BLOCKED_TOOLS` doesn't match a valid tool
-- **Error output**: When invalid tools are detected, the server shows which tools are invalid and lists all valid tool names
-- **Startup failure**: The server will not start with invalid tool configurations, preventing silent failures
+Enable/disable specific tools using the `TOOL__` prefix pattern:
 
-### Example Configurations
-
-**Read-only access:**
 ```bash
-ALLOWED_TOOLS="get_recipes,get_meal_plan,get_meal_plan_sections,get_products,get_stock,get_shopping_list,get_chores,get_tasks,get_locations,get_shopping_locations,get_product_groups,get_quantity_units,get_users,get_batteries,get_equipment,get_stock_volatile,get_recipe_by_id,get_price_history,get_stock_by_location,get_stock_by_product,get_recipe_fulfillment,get_recipes_fulfillment"
+# Stock management
+TOOL__get_all_stock=true
+TOOL__purchase_product=true
+TOOL__consume_product=false
+
+# Shopping lists  
+TOOL__get_shopping_list=true
+TOOL__add_shopping_list_item=true
+
+# Meal planning
+TOOL__get_meal_plan=true
+TOOL__add_recipe_to_meal_plan=true
 ```
 
-**Meal planning + recipes + shopping (safe management):**
+### Available Tool Categories
+
+#### 📦 Stock Management Tools
 ```bash
-ALLOWED_TOOLS="get_stock_volatile,get_shopping_list,get_chores,get_tasks,get_locations,get_shopping_locations,get_product_groups,get_quantity_units,get_users,get_recipes_fulfillment,get_meal_plan,get_products,get_recipes,get_recipe_by_id,get_stock,get_batteries,get_equipment,add_shopping_list_item,add_recipe_to_meal_plan,get_meal_plan_sections,delete_recipe_from_meal_plan,get_price_history,get_stock_by_location,get_stock_by_product,add_recipe_products_to_shopping_list,add_missing_products_to_shopping_list,get_recipe_fulfillment,remove_shopping_list_item"
+TOOL__get_all_stock=true                     # Get all stock entries
+TOOL__get_stock_volatile=true                # Get due/expired products
+TOOL__get_stock_by_location=true             # Stock by specific location
+TOOL__inventory_product=true                 # Set stock amounts
+TOOL__purchase_product=true                  # Record purchases
+TOOL__consume_product=true                   # Record consumption
+TOOL__transfer_product=true                  # Move stock between locations
+TOOL__open_product=true                      # Mark products as opened
 ```
 
-**Meal planning only:**
+#### 🛒 Shopping & Planning Tools
 ```bash
-ALLOWED_TOOLS="get_recipes,get_meal_plan,get_meal_plan_sections,add_recipe_to_meal_plan,delete_recipe_from_meal_plan,get_recipe_by_id,get_recipe_fulfillment"
+TOOL__get_shopping_list=true                 # Get shopping lists
+TOOL__add_shopping_list_item=true            # Add to shopping list
+TOOL__remove_shopping_list_item=true         # Remove from shopping list
+TOOL__get_shopping_locations=true            # Get store locations
 ```
 
-**Block dangerous operations:**
+#### 🍽️ Recipe & Meal Planning Tools
 ```bash
-BLOCKED_TOOLS="create_recipe,call_grocy_api,test_request,undo_action,purchase_product,consume_product,inventory_product,transfer_product,track_chore_execution,complete_task,charge_battery,consume_recipe,open_product"
+TOOL__get_recipes=true                       # Get all recipes
+TOOL__get_recipe_by_id=true                  # Get specific recipe
+TOOL__create_recipe=true                     # Create new recipes
+TOOL__get_recipe_fulfillment=true            # Check recipe availability
+TOOL__consume_recipe=true                    # Cook a recipe
+TOOL__get_meal_plan=true                     # Get meal plans
+TOOL__add_recipe_to_meal_plan=true           # Schedule meals
+TOOL__delete_recipe_from_meal_plan=true      # Remove from meal plan
+TOOL__cooked_something=true                  # Complete cooking workflow
 ```
 
-## Authentication Configuration
-
-The tool supports API Key authentication for Grocy.
-
-### API Key (Required for most operations)
-- `GROCY_APIKEY_VALUE`: Your Grocy API key.
-- Header Name: The API key is always sent using the `GROCY-API-KEY` header.
-- Example:
-  ```
-  GROCY_APIKEY_VALUE=yourverysecretapikey
-  ```
-- Usage: When `GROCY_APIKEY_VALUE` is set, requests will include the `GROCY-API-KEY` header with its value.
-
-## HTTP/SSE Transport
-
-The MCP Grocy API server now supports:
-
-- **stdio** (default, Context7 MCP protocol)
-- **HTTP** (streamable, Context7-compatible, opt-in, port configurable via `HTTP_SERVER_PORT`)
-- **SSE** (Server-Sent Events, for backward compatibility)
-
-To enable HTTP/SSE transport, set:
-
-```
-ENABLE_HTTP_SERVER=true
-HTTP_SERVER_PORT=8080 # (optional, default: 8080)
-```
-
-The HTTP server will listen on the port specified by `HTTP_SERVER_PORT`. Make sure to expose this port in your Dockerfile or deployment configuration.
-
-- POST requests to `/mcp` for streamable HTTP (NDJSON or JSON)
-- GET requests to `/mcp/sse` for SSE (Server-Sent Events)
-
-All transports use the same MCP protocol and core logic.
-
-## Configuration Examples
-
-### Local Development with Grocy
+#### 🏠 Household Management Tools
 ```bash
+TOOL__track_chore_execution=true             # Record chore completion
+TOOL__complete_task=true                     # Mark tasks as done
+TOOL__charge_battery=true                    # Record battery charging
+TOOL__get_chores=true                        # Get all chores
+TOOL__get_tasks=true                         # Get all tasks
+TOOL__get_batteries=true                     # Get battery info
+```
+
+#### 🔧 System & Utility Tools
+```bash
+TOOL__get_products=true                      # Get product information
+TOOL__lookup_product=true                    # Fuzzy product search
+TOOL__get_locations=true                     # Get storage locations
+TOOL__get_quantity_units=true                # Get quantity units
+TOOL__get_users=true                         # Get user information
+TOOL__call_grocy_api=true                    # Make custom API calls
+TOOL__test_request=true                      # Test API endpoints
+```
+
+### Tool Sub-Configuration
+
+Some tools have additional configuration options:
+
+```bash
+# cooked_something tool options
+TOOL__cooked_something__allow_meal_plan_entry_already_done=false
+TOOL__cooked_something__allow_no_meal_plan=false
+TOOL__cooked_something__print_labels=true
+```
+
+## 📋 Configuration Presets
+
+### Read-Only Mode
+Safe for information gathering only:
+```bash
+# Enable only GET operations
+TOOL__get_all_stock=true
+TOOL__get_recipes=true
+TOOL__get_meal_plan=true
+TOOL__get_shopping_list=true
+TOOL__get_products=true
+TOOL__lookup_product=true
+# Disable all modification tools
+TOOL__purchase_product=false
+TOOL__consume_product=false
+TOOL__add_shopping_list_item=false
+```
+
+### Meal Planning Focus
+For meal planning and recipe management:
+```bash
+# Recipe and meal planning tools
+TOOL__get_recipes=true
+TOOL__get_recipe_by_id=true
+TOOL__get_recipe_fulfillment=true
+TOOL__get_meal_plan=true
+TOOL__add_recipe_to_meal_plan=true
+TOOL__delete_recipe_from_meal_plan=true
+TOOL__cooked_something=true
+
+# Supporting tools
+TOOL__get_products=true
+TOOL__lookup_product=true
+TOOL__get_all_stock=true
+TOOL__add_missing_products_to_shopping_list=true
+```
+
+### Stock Management Focus
+For inventory and shopping management:
+```bash
+# Stock operations
+TOOL__get_all_stock=true
+TOOL__get_stock_volatile=true
+TOOL__purchase_product=true
+TOOL__consume_product=true
+TOOL__inventory_product=true
+
+# Shopping management  
+TOOL__get_shopping_list=true
+TOOL__add_shopping_list_item=true
+TOOL__remove_shopping_list_item=true
+
+# Product management
+TOOL__get_products=true
+TOOL__lookup_product=true
+```
+
+## 🔒 Security Considerations
+
+### API Key Security
+- Never commit API keys to version control
+- Use `.env` files for local development
+- Use secure environment variable management in production
+
+### Tool Access Control
+- Disable unused tools to reduce attack surface
+- Use read-only mode for information-gathering use cases
+- Be cautious with tools that modify data (`purchase_product`, `consume_product`, etc.)
+
+### Network Security
+- Use HTTPS for production Grocy instances
+- Consider SSL verification settings carefully
+- Limit response sizes to prevent memory issues
+
+## 📝 Environment File Examples
+
+### Development Configuration
+```bash
+# .env for development
 GROCY_BASE_URL=http://localhost:9283
-GROCY_APIKEY_VALUE=yourlocalapikey
+GROCY_APIKEY_VALUE=dev_api_key_here
 GROCY_ENABLE_SSL_VERIFY=false
 REST_RESPONSE_SIZE_LIMIT=50000
+
+# Enable HTTP server for testing
+ENABLE_HTTP_SERVER=true
+HTTP_SERVER_PORT=8080
+
+# Enable commonly used tools
+TOOL__get_all_stock=true
+TOOL__get_recipes=true
+TOOL__get_meal_plan=true
+TOOL__lookup_product=true
 ```
 
-### Production Grocy API with API Key
+### Production Configuration
 ```bash
-GROCY_BASE_URL=https://my.grocy.server.com
-GROCY_APIKEY_VALUE=yourproductionapikey
+# .env for production
+GROCY_BASE_URL=https://grocy.yourdomain.com
+GROCY_APIKEY_VALUE=secure_production_key
+GROCY_ENABLE_SSL_VERIFY=true
+REST_RESPONSE_SIZE_LIMIT=20000
+
+# Selective tool enablement for security
+TOOL__get_all_stock=true
+TOOL__get_recipes=true
+TOOL__add_recipe_to_meal_plan=true
+TOOL__get_shopping_list=true
+# Explicitly disable sensitive operations
+TOOL__call_grocy_api=false
+TOOL__test_request=false
 ```
 
-### Grocy API with Custom Headers
+## 🔄 Configuration Management
+
+### Loading Order
+1. Default values
+2. Environment variables
+3. `.env` file (if present)
+
+### Validation
+- Server validates all tool names at startup
+- Invalid configuration prevents server start
+- Error messages show valid options
+
+### Runtime Changes
+- Configuration changes require server restart
+- Use process managers (PM2, systemd) for production restarts
+- Docker containers need to be recreated with new environment
+
+## 🐛 Troubleshooting Configuration
+
+### Common Issues
+
+**Tool toggle not working**
+- Check exact spelling of tool names
+- Ensure `TOOL__` prefix is correct
+- Verify boolean values (`true`/`false`)
+
+**SSL/TLS connection errors**
+- Set `GROCY_ENABLE_SSL_VERIFY=false` for self-signed certificates
+- Verify Grocy URL is accessible
+- Check firewall and network settings
+
+**Large response errors**
+- Increase `REST_RESPONSE_SIZE_LIMIT`
+- Consider disabling unused tools to reduce response size
+- Check Grocy instance has reasonable data volumes
+
+### Debugging Configuration
 ```bash
-GROCY_BASE_URL=https://my.grocy.server.com
-GROCY_APIKEY_VALUE=yourproductionapikey
+# Use mock mode to test configuration
+npm run dev
+
+# Enable MCP inspector for protocol debugging  
+npm run inspector
+
+# Check configuration loading
+# (Server logs show loaded configuration at startup)
 ```
-
-## Changing Configuration
-
-Configuration can be updated by:
-1. Setting environment variables before starting the server
-2. Modifying the MCP server configuration file
-3. Using environment variable commands in your terminal
-
-Remember to restart the server after changing configuration for the changes to take effect.

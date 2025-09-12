@@ -9,11 +9,11 @@ Edit `claude_desktop_config.json`(for Claude Desktop) or `.cursor/mcp.json`(for 
 ```json
 {
   "mcpServers": {
-    "mcp-grocy-api": {
+    "mcp-grocy": {
       "command": "npx",
       "args": [
         "-y",
-        "miguelangel-nubla/mcp-grocy-api"
+        "miguelangel-nubla/mcp-grocy"
       ], 
       "env": {
         "GROCY_BASE_URL": "",
@@ -29,11 +29,11 @@ Or you can use Docker:
 ```json
 {
   "mcpServers": {
-    "mcp-grocy-api": {
+    "mcp-grocy": {
       "command": "docker",
       "args": [
         "run",
-        "ghcr.io/miguelangel-nubla/mcp-grocy-api",
+        "ghcr.io/miguelangel-nubla/mcp-grocy",
         "tini",
         "--",
         "node",
@@ -56,8 +56,8 @@ To install using Node.js, you will need to have Node.js and npm (or yarn) instal
 
 Clone the repository:
 ```bash
-git clone -b main https://github.com/miguelangel-nubla/mcp-grocy-api.git
-cd mcp-grocy-api
+git clone -b main https://github.com/miguelangel-nubla/mcp-grocy.git
+cd mcp-grocy
 ```
 
 Install dependencies:
@@ -79,7 +79,7 @@ yarn start
 You can also run the server directly using npx (Node.js 12.x or newer):
 
 ```bash
-npx -y mcp-grocy-api
+npx -y mcp-grocy
 ```
 
 ## Docker
@@ -87,13 +87,13 @@ npx -y mcp-grocy-api
 To run using Docker, you first need to build the Docker image:
 
 ```bash
-docker build -t ghcr.io/miguelangel-nubla/mcp-grocy-api .
+docker build -t ghcr.io/miguelangel-nubla/mcp-grocy .
 ```
 
 Then run the container with tini:
 
 ```bash
-docker run -p mcp-grocy-api tini -- node build/main.js
+docker run -p mcp-grocy tini -- node build/main.js
 ```
 
 ## HTTP/SSE Transport

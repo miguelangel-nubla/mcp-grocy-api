@@ -64,8 +64,8 @@ export class GrocyMcpServer {
       {
         name: SERVER_NAME,
         version: VERSION,
-        serverUrl: "https://github.com/miguelangel-nubla/mcp-grocy-api",
-        documentationUrl: "https://github.com/miguelangel-nubla/mcp-grocy-api/blob/main/README.md"
+        serverUrl: "https://github.com/miguelangel-nubla/mcp-grocy",
+        documentationUrl: "https://github.com/miguelangel-nubla/mcp-grocy/blob/main/README.md"
       },
       {
         capabilities: {
@@ -197,7 +197,7 @@ export class GrocyMcpServer {
     // Start STDIO transport
     const transport = new StdioServerTransport();
     await this.server.connect(transport);
-    console.error('Grocy API MCP server running on stdio');
+    console.error('Grocy MCP server running on stdio');
 
     // Start HTTP/SSE transport if enabled
     const envConfig = config.get();

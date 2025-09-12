@@ -1,15 +1,15 @@
 {
-  "name": "mcp-grocy-api",
+  "name": "mcp-grocy",
   "version": "1.8.0",
-  "description": "Model Context Protocol (MCP) wrapper for grocy API",
+  "description": "Model Context Protocol (MCP) server for Grocy integration",
   "license": "MIT",
   "type": "module",
   "publishConfig": {
-    "name": "mcp-grocy-api",
+    "name": "mcp-grocy",
     "access": "public"
   },
   "bin": {
-    "mcp-grocy-api": "./build/main.js"
+    "mcp-grocy": "./build/main.js"
   },
   "files": [
     "build",
@@ -75,12 +75,12 @@
   "author": "miguelangel-nubla",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/miguelangel-nubla/mcp-grocy-api.git"
+    "url": "git+https://github.com/miguelangel-nubla/mcp-grocy.git"
   },
   "bugs": {
-    "url": "https://github.com/miguelangel-nubla/mcp-grocy-api/issues"
+    "url": "https://github.com/miguelangel-nubla/mcp-grocy/issues"
   },
-  "homepage": "https://github.com/miguelangel-nubla/mcp-grocy-api#readme",
+  "homepage": "https://github.com/miguelangel-nubla/mcp-grocy#readme",
   "engines": {
     "node": ">=18.0.0"
   }
