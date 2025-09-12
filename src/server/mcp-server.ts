@@ -19,8 +19,8 @@ import { ResourceHandler } from './resources.js';
 
 export class GrocyMcpServer {
   private server!: Server;
-  private allowedTools: Set<string> | null = null;
-  private blockedTools: Set<string> = new Set();
+  private enabledTools: Set<string> = new Set();
+  private toolSubConfigs: Map<string, Map<string, boolean>> = new Map();
   private resourceHandler: ResourceHandler;
 
   // Expose server instance for HTTP/SSE transport
@@ -35,45 +35,28 @@ export class GrocyMcpServer {
   }
 
   private parseToolConfiguration(): void {
-    const { allowedTools, blockedTools } = config.parseToolConfiguration();
+    const { enabledTools, toolSubConfigs } = config.parseToolConfiguration();
+    this.toolSubConfigs = toolSubConfigs;
     
     // Validate tool names against registry
     const validToolNames = new Set(toolRegistry.getToolNames());
     
-    if (allowedTools) {
-      const invalidAllowedTools = Array.from(allowedTools).filter(tool => !validToolNames.has(tool));
-      if (invalidAllowedTools.length > 0) {
-        console.error(`[ERROR] Invalid tool names in ALLOWED_TOOLS: ${invalidAllowedTools.join(', ')}`);
+    if (enabledTools.size > 0) {
+      const invalidTools = Array.from(enabledTools).filter(tool => !validToolNames.has(tool));
+      if (invalidTools.length > 0) {
+        console.error(`[ERROR] Invalid tool names in configuration: ${invalidTools.join(', ')}`);
         console.error(`[ERROR] Valid tool names are: ${Array.from(validToolNames).sort().join(', ')}`);
         process.exit(1);
       }
-      this.allowedTools = allowedTools;
-    }
-    
-    if (blockedTools.size > 0) {
-      const invalidBlockedTools = Array.from(blockedTools).filter(tool => !validToolNames.has(tool));
-      if (invalidBlockedTools.length > 0) {
-        console.error(`[ERROR] Invalid tool names in BLOCKED_TOOLS: ${invalidBlockedTools.join(', ')}`);
-        console.error(`[ERROR] Valid tool names are: ${Array.from(validToolNames).sort().join(', ')}`);
-        process.exit(1);
-      }
-      this.blockedTools = blockedTools;
+      this.enabledTools = enabledTools;
+    } else {
+      console.error('[CONFIG] No tools enabled - server will have no tools available');
     }
   }
 
   private isToolAllowed(toolName: string): boolean {
-    // If tool is explicitly blocked, deny
-    if (this.blockedTools.has(toolName)) {
-      return false;
-    }
-
-    // If allowlist is configured, only allow tools in the list
-    if (this.allowedTools) {
-      return this.allowedTools.has(toolName);
-    }
-
-    // If no allowlist but blocklist exists, allow unless blocked
-    return true;
+    // Only enabled tools are allowed - all others are disabled by default
+    return this.enabledTools.has(toolName);
   }
 
   private async setupServer(): Promise<void> {
@@ -160,7 +143,7 @@ export class GrocyMcpServer {
       if (!this.isToolAllowed(toolName)) {
         throw new McpError(
           ErrorCode.InvalidRequest, 
-          `Tool '${toolName}' is not available. Check your ALLOWED_TOOLS or BLOCKED_TOOLS configuration.`
+          `Tool '${toolName}' is not enabled. Set TOOL__${toolName}=true in your configuration to enable it.`
         );
       }
 
@@ -174,7 +157,8 @@ export class GrocyMcpServer {
       }
 
       try {
-        const result = await handler(request.params.arguments);
+        const subConfigs = this.toolSubConfigs.get(toolName);
+        const result = await handler(request.params.arguments, subConfigs);
         return result as CallToolResult; // Cast to proper MCP type
       } catch (error: any) {
         console.error(`Error executing tool ${toolName}:`, error);

@@ -132,11 +132,25 @@ export class RecipeToolHandlers extends BaseToolHandler {
     });
   };
 
-  public markRecipeFromMealPlanEntryAsCooked: ToolHandler = async (args: any): Promise<ToolResult> => {
-    const { mealPlanEntryId, stockAmounts } = args || {};
+  public markRecipeFromMealPlanEntryAsCooked: ToolHandler = async (args: any, subConfigs?: Map<string, boolean>): Promise<ToolResult> => {
+    const { mealPlanEntryId, recipeId, stockAmounts } = args || {};
     
-    if (!mealPlanEntryId) {
-      throw new McpError(ErrorCode.InvalidParams, 'mealPlanEntryId is required.');
+    // Sub-configuration options
+    const allowMealPlanEntryAlreadyDone = subConfigs?.get('allow_meal_plan_entry_already_done') ?? false;
+    const printLabels = subConfigs?.get('print_labels') ?? true;
+    const allowNoMealPlan = subConfigs?.get('allow_no_meal_plan') ?? false;
+    
+    // Validate required parameters based on mode
+    if (!allowNoMealPlan && !mealPlanEntryId) {
+      throw new McpError(ErrorCode.InvalidParams, 'mealPlanEntryId is required when allow_no_meal_plan is false.');
+    }
+    
+    if (allowNoMealPlan && !recipeId) {
+      throw new McpError(ErrorCode.InvalidParams, 'recipeId is required when allow_no_meal_plan is true.');
+    }
+    
+    if (allowNoMealPlan && mealPlanEntryId) {
+      throw new McpError(ErrorCode.InvalidParams, 'mealPlanEntryId should not be provided when allow_no_meal_plan is true. Use recipeId instead.');
     }
 
     if (!stockAmounts || !Array.isArray(stockAmounts) || stockAmounts.length === 0) {
@@ -152,55 +166,73 @@ export class RecipeToolHandlers extends BaseToolHandler {
     }
 
     const completedSteps: string[] = [];
+    let actualRecipeId: number;
+    let totalServings: number;
+    let mealPlanDate: string;
+    let mealplanShadow: string;
     
     try {
-      // Get the specific meal plan entry
-      const mealPlanResponse = await apiClient.get(`/objects/meal_plan/${mealPlanEntryId}`);
-      const mealPlanEntry = mealPlanResponse.data;
+      if (allowNoMealPlan) {
+        // Direct recipe mode - no meal plan entry involved
+        actualRecipeId = recipeId;
+        totalServings = stockAmounts.reduce((sum: number, amount: number) => sum + amount, 0);
+        mealPlanDate = new Date().toISOString().split('T')[0];
+        mealplanShadow = `${mealPlanDate}#direct-recipe-${actualRecipeId}`;
+        
+        completedSteps.push('Using direct recipe mode (no meal plan entry)');
+      } else {
+        // Meal plan mode - traditional workflow
+        const mealPlanResponse = await apiClient.get(`/objects/meal_plan/${mealPlanEntryId}`);
+        const mealPlanEntry = mealPlanResponse.data;
 
-      if (!mealPlanEntry) {
-        throw new Error(`Meal plan entry ${mealPlanEntryId} not found.`);
+        if (!mealPlanEntry) {
+          throw new Error(`Meal plan entry ${mealPlanEntryId} not found.`);
+        }
+
+        if (mealPlanEntry.done == 1 && !allowMealPlanEntryAlreadyDone) {
+          throw new Error(`Meal plan entry ${mealPlanEntryId} is already marked as done. Cannot mark as cooked again.`);
+        }
+
+        actualRecipeId = mealPlanEntry.recipe_id;
+        totalServings = stockAmounts.reduce((sum: number, amount: number) => sum + amount, 0);
+        mealPlanDate = mealPlanEntry.day || new Date().toISOString().split('T')[0];
+        mealplanShadow = `${mealPlanDate}#${mealPlanEntryId}`;
+        
+        // Mark the meal plan entry as done and update recipe_servings
+        await apiClient.put(`/objects/meal_plan/${mealPlanEntryId}`, {
+          done: 1,
+          recipe_servings: totalServings
+        });
+        completedSteps.push('Meal plan entry marked as done');
       }
 
-      if (mealPlanEntry.done == 1) {
-        throw new Error(`Meal plan entry ${mealPlanEntryId} is already marked as done. Cannot mark as cooked again.`);
+      // For direct recipe mode, consume ingredients directly using the recipe ID
+      // For meal plan mode, try to find and use the shadow recipe
+      if (allowNoMealPlan) {
+        // Direct consumption using the recipe ID
+        await apiClient.post(`/recipes/${actualRecipeId}/consume`);
+        completedSteps.push('Recipe consumed directly');
+      } else {
+        // Query for the mealplan shadow recipe by name
+        const shadowRecipeResponse = await apiClient.get('/objects/recipes', {
+          queryParams: { 'query[]': `name=${mealplanShadow}` }
+        });
+        
+        if (shadowRecipeResponse.data.length === 0) {
+          throw new Error(`Mealplan shadow recipe '${mealplanShadow}' not found. Cannot consume ingredients.`);
+        }
+        
+        const shadowRecipeId = shadowRecipeResponse.data[0].id;
+        
+        // Consume ingredients using the shadow recipe ID
+        await apiClient.post(`/recipes/${shadowRecipeId}/consume`);
+        completedSteps.push('Recipe consumed via meal plan entry');
       }
-
-      const recipeId = mealPlanEntry.recipe_id;
-
-      // Calculate total servings
-      const totalServings = stockAmounts.reduce((sum: number, amount: number) => sum + amount, 0);
-      
-      // Create recipe name with YYYY-MM-DD#<meal_plan.id> pattern  
-      const mealPlanDate = mealPlanEntry.day || new Date().toISOString().split('T')[0];
-      const mealplanShadow = `${mealPlanDate}#${mealPlanEntryId}`;
-      
-      // Mark the meal plan entry as done and update recipe_servings
-      await apiClient.put(`/objects/meal_plan/${mealPlanEntryId}`, {
-        done: 1,
-        recipe_servings: totalServings
-      });
-      completedSteps.push('Meal plan entry marked as done');
-
-      // Query for the mealplan shadow recipe by name
-      const shadowRecipeResponse = await apiClient.get('/objects/recipes', {
-        queryParams: { 'query[]': `name=${mealplanShadow}` }
-      });
-      
-      if (shadowRecipeResponse.data.length === 0) {
-        throw new Error(`Mealplan shadow recipe '${mealplanShadow}' not found. Cannot consume ingredients.`);
-      }
-      
-      const shadowRecipeId = shadowRecipeResponse.data[0].id;
-      
-      // Consume ingredients using the shadow recipe ID
-      await apiClient.post(`/recipes/${shadowRecipeId}/consume`);
-      completedSteps.push('Recipe ingredients consumed');
 
       // Split stock entry and print labels for each portion
       let stockEntries: { splitEntries: Array<{stockId: any, amount: number, type: string, unit: string}>, labelsPrinted: number } = { splitEntries: [], labelsPrinted: 0 };
       
-      const recipeResponse = await apiClient.get(`/objects/recipes/${recipeId}`);
+      const recipeResponse = await apiClient.get(`/objects/recipes/${actualRecipeId}`);
       const recipe = recipeResponse.data;
       
       if (recipe && recipe.product_id) {
@@ -246,20 +278,22 @@ export class RecipeToolHandlers extends BaseToolHandler {
             getUnitForm
           );
           
-          // Print labels for all entries
-          for (const entry of stockEntries.splitEntries) {
-            try {
-              await apiClient.get(`/stock/entry/${entry.stockId}/printlabel`);
-              stockEntries.labelsPrinted++;
-            } catch (error) {
-              console.error(`Failed to print label for stock entry ${entry.stockId}:`, error);
+          // Print labels for all entries (if enabled)
+          if (printLabels) {
+            for (const entry of stockEntries.splitEntries) {
+              try {
+                await apiClient.get(`/stock/entry/${entry.stockId}/printlabel`);
+                stockEntries.labelsPrinted++;
+              } catch (error) {
+                console.error(`Failed to print label for stock entry ${entry.stockId}:`, error);
+              }
             }
           }
         }
       }
 
       return this.createSuccessResult({
-        message: `Meal plan entry ${mealPlanEntryId} marked as cooked (recipe ${recipeId}, ${totalServings} servings consumed, ${stockEntries.splitEntries.length} stock entries created, ${stockEntries.labelsPrinted} labels printed)`,
+        message: `Recipe ${actualRecipeId} cooked (${totalServings} servings consumed, ${stockEntries.splitEntries.length} stock entries created, ${stockEntries.labelsPrinted} labels printed)`,
         stockEntries,
       });
 

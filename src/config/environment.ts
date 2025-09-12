@@ -22,9 +22,6 @@ const EnvironmentSchema = z.object({
     return parsed;
   }),
 
-  // Tool Configuration
-  ALLOWED_TOOLS: z.string().optional(),
-  BLOCKED_TOOLS: z.string().optional(),
 
   // Build Configuration
   RELEASE_VERSION: z.string().optional(),
@@ -102,27 +99,67 @@ export class ConfigManager {
     return headers;
   }
 
-  public parseToolConfiguration(): { allowedTools: Set<string> | null; blockedTools: Set<string> } {
-    let allowedTools: Set<string> | null = null;
-    const blockedTools: Set<string> = new Set();
+  public parseToolConfiguration(): { enabledTools: Set<string>, toolSubConfigs: Map<string, Map<string, boolean>> } {
+    const enabledTools: Set<string> = new Set();
+    const disabledTools: Set<string> = new Set();
+    const toolSubConfigs: Map<string, Map<string, boolean>> = new Map();
+    const errors: string[] = [];
 
-    if (this.config.ALLOWED_TOOLS) {
-      const allowedList = this.config.ALLOWED_TOOLS.split(',').map(tool => tool.trim()).filter(Boolean);
-      allowedTools = new Set(allowedList);
-      console.error(`[CONFIG] ALLOWED_TOOLS: ${Array.from(allowedTools).join(', ')}`);
+    // Scan all environment variables for TOOL__ patterns
+    for (const [key, value] of Object.entries(process.env)) {
+      if (!key.startsWith('TOOL__')) continue;
+      
+      const parts = key.split('__');
+      
+      if (parts.length === 3) {
+        // TOOL__tool_name__sub_config
+        const toolName = parts[1];
+        const subConfig = parts[2];
+        if (!toolSubConfigs.has(toolName)) {
+          toolSubConfigs.set(toolName, new Map());
+        }
+        toolSubConfigs.get(toolName)!.set(subConfig, value === 'true');
+      } else if (parts.length === 2) {
+        // TOOL__tool_name
+        const toolName = parts[1];
+        if (value === 'true') {
+          enabledTools.add(toolName);
+        } else if (value === 'false') {
+          disabledTools.add(toolName);
+        } else {
+          errors.push(`${key}=${value} (must be 'true' or 'false')`);
+        }
+      }
+    }
+    
+    // Error out if invalid values found
+    if (errors.length > 0) {
+      console.error('[CONFIG ERROR] Invalid TOOL_ configuration values:');
+      errors.forEach(error => console.error(`  - ${error}`));
+      console.error('All TOOL_ variables must be set to either "true" or "false"');
+      process.exit(1);
+    }
+    
+    if (enabledTools.size > 0) {
+      console.error(`[CONFIG] Enabled tools (${enabledTools.size}): ${Array.from(enabledTools).sort().join(', ')}`);
+    } else {
+      console.error('[CONFIG] No tools enabled - all tools are disabled by default');
     }
 
-    if (this.config.BLOCKED_TOOLS) {
-      const blockedList = this.config.BLOCKED_TOOLS.split(',').map(tool => tool.trim()).filter(Boolean);
-      blockedList.forEach(tool => blockedTools.add(tool));
-      console.error(`[CONFIG] BLOCKED_TOOLS: ${Array.from(blockedTools).join(', ')}`);
+    if (disabledTools.size > 0) {
+      console.error(`[CONFIG] Explicitly disabled tools (${disabledTools.size}): ${Array.from(disabledTools).sort().join(', ')}`);
     }
 
-    if (!allowedTools && blockedTools.size === 0) {
-      console.error('[CONFIG] No tool restrictions configured - all tools available');
+    // Log sub-configurations
+    if (toolSubConfigs.size > 0) {
+      console.error('[CONFIG] Tool sub-configurations:');
+      for (const [toolName, subConfigs] of toolSubConfigs) {
+        const subConfigList = Array.from(subConfigs.entries()).map(([key, value]) => `${key}=${value}`);
+        console.error(`  - ${toolName}: ${subConfigList.join(', ')}`);
+      }
     }
 
-    return { allowedTools, blockedTools };
+    return { enabledTools, toolSubConfigs };
   }
 }
 

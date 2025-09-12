@@ -17,7 +17,7 @@ export interface ToolResult {
 }
 
 export interface ToolHandler {
-  (args: any): Promise<ToolResult>;
+  (args: any, subConfigs?: Map<string, boolean>): Promise<ToolResult>;
 }
 
 export interface ToolModule {

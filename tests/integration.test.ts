@@ -17,7 +17,7 @@ vi.mock('../src/config/environment.js', () => ({
     getApiUrl: () => 'http://test-grocy:9283/api',
     hasApiKeyAuth: () => true,
     getCustomHeaders: () => ({}),
-    parseToolConfiguration: () => ({ allowedTools: null, blockedTools: new Set() })
+    parseToolConfiguration: () => ({ enabledTools: new Set() })
   }
 }));
 

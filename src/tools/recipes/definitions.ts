@@ -1,4 +1,5 @@
 import { ToolDefinition } from '../types.js';
+import config from '../../config/environment.js';
 
 export const recipeToolDefinitions: ToolDefinition[] = [
   {
@@ -151,26 +152,43 @@ export const recipeToolDefinitions: ToolDefinition[] = [
       required: ['recipeId']
     }
   },
-  {
-    name: 'cooked_something',
-    description: 'When the user cooks something this records it as done, consumes recipe ingredients, and creates labeled stock entries with custom portion sizes.',
-    inputSchema: {
-      type: 'object',
-      properties: {
-        mealPlanEntryId: {
-          type: 'number',
-          description: 'ID of the meal plan entry. Note: This will fail if the meal plan entry is already marked as done (done=1).'
+  (() => {
+    const { toolSubConfigs } = config.parseToolConfiguration();
+    const subConfigs = toolSubConfigs?.get('cooked_something');
+    const allowNoMealPlan = subConfigs?.get('allow_no_meal_plan') ?? false;
+    const allowAlreadyDone = subConfigs?.get('allow_meal_plan_entry_already_done') ?? false;
+    
+    return {
+      name: 'cooked_something',
+      description: 'When the user cooks something this records it as done, consumes recipe ingredients, and creates labeled stock entries with custom portion sizes.',
+      inputSchema: {
+        type: 'object',
+        properties: {
+          ...(allowNoMealPlan ? {
+            recipeId: {
+              type: 'number',
+              description: 'ID of the recipe to cook directly.'
+            }
+          } : {
+            mealPlanEntryId: {
+              type: 'number', 
+              description: `ID of the meal plan entry.${allowAlreadyDone ? '' : ' Note: This will fail if the meal plan entry is already marked as done (done=1).'}`
+            }
+          }),
+          stockAmounts: {
+            type: 'array',
+            items: {
+              type: 'number',
+              minimum: 0.1
+            },
+            description: 'Array of serving amounts for each stock entry to create (e.g., [1, 2, 2] for 1 single serving + 2 double servings). Total will be used for ingredient consumption.'
+          }
         },
-        stockAmounts: {
-          type: 'array',
-          items: {
-            type: 'number',
-            minimum: 0.1
-          },
-          description: 'Array of serving amounts for each stock entry to create (e.g., [1, 2, 2] for 1 single serving + 2 double servings). Total will be used for ingredient consumption.'
-        }
-      },
-      required: ['mealPlanEntryId', 'stockAmounts']
-    }
-  }
+        required: [
+          ...(allowNoMealPlan ? ['recipeId'] : ['mealPlanEntryId']),
+          'stockAmounts'
+        ]
+      }
+    };
+  })()
 ];
