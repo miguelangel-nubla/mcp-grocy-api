@@ -21,7 +21,7 @@ const mealPlanToolDefinitions = [
       properties: {
         date: {
           type: 'string',
-          description: 'Date in YYYY-MM-DD format (e.g., "2024-12-25"). Use today\'s date or future dates to see planned meals.'
+          description: 'Date in YYYY-MM-DD format (e.g., "2024-12-25"). Use today\'s date or future dates to see planned meals. Consider that asking for today past 00:00 AM might mean yesterday. Do both days if not sure.'
         }
       },
       required: ['date']
@@ -311,7 +311,7 @@ class ActionToolHandlers extends BaseToolHandler {
       ...(note ? { note } : {})
     };
     
-    return this.handleApiCall(`chores/${choreId}/execute`, 'Track chore execution', {
+    return this.handleApiCall(`/chores/${choreId}/execute`, 'Track chore execution', {
       method: 'POST',
       body
     });
@@ -323,7 +323,7 @@ class ActionToolHandlers extends BaseToolHandler {
       throw new McpError(ErrorCode.InvalidParams, 'taskId is required');
     }
     
-    return this.handleApiCall(`tasks/${taskId}/complete`, 'Complete task', {
+    return this.handleApiCall(`/tasks/${taskId}/complete`, 'Complete task', {
       method: 'POST',
       body: note ? { note } : {}
     });
@@ -341,7 +341,7 @@ class ActionToolHandlers extends BaseToolHandler {
       ...(note ? { note } : {})
     };
     
-    return this.handleApiCall(`batteries/${batteryId}/charge`, 'Charge battery', {
+    return this.handleApiCall(`/batteries/${batteryId}/charge`, 'Charge battery', {
       method: 'POST',
       body
     });

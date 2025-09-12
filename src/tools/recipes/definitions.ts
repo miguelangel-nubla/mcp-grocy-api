@@ -152,22 +152,25 @@ export const recipeToolDefinitions: ToolDefinition[] = [
     }
   },
   {
-    name: 'mark_recipe_from_meal_plan_entry_as_cooked',
-    description: 'Mark a recipe as cooked by finding its undone meal plan entry, marking it as done, consuming all ingredients and printing labels for any stock entries created.',
+    name: 'cooked_something',
+    description: 'When the user cooks something this records it as done, consumes recipe ingredients, and creates labeled stock entries with custom portion sizes.',
     inputSchema: {
       type: 'object',
       properties: {
-        recipeId: {
+        mealPlanEntryId: {
           type: 'number',
-          description: 'ID of the recipe to mark as cooked. Use get_recipes tool to find the correct recipe ID by name.'
+          description: 'ID of the meal plan entry. Note: This will fail if the meal plan entry is already marked as done (done=1).'
         },
-        servings: {
-          type: 'number',
-          description: 'Number of servings to consume (default: 1)',
-          default: 1
+        stockAmounts: {
+          type: 'array',
+          items: {
+            type: 'number',
+            minimum: 0.1
+          },
+          description: 'Array of serving amounts for each stock entry to create (e.g., [1, 2, 2] for 1 single serving + 2 double servings). Total will be used for ingredient consumption.'
         }
       },
-      required: ['recipeId', 'servings']
+      required: ['mealPlanEntryId', 'stockAmounts']
     }
   }
 ];

@@ -2,8 +2,10 @@ import { BaseToolHandler } from '../base.js';
 import { ToolResult, ToolHandler } from '../types.js';
 import { ErrorCode, McpError } from '@modelcontextprotocol/sdk/types.js';
 import apiClient from '../../api/client.js';
+import { StockToolHandlers } from '../stock/handlers.js';
 
 export class RecipeToolHandlers extends BaseToolHandler {
+  private stockHandlers = new StockToolHandlers();
   public getRecipes: ToolHandler = async (args: any): Promise<ToolResult> => {
     const { fields } = args || {};
     if (!fields || !Array.isArray(fields) || fields.length === 0) {
@@ -50,7 +52,6 @@ export class RecipeToolHandlers extends BaseToolHandler {
       name, 
       description = '', 
       servings = 1, 
-      baseServingAmount = 1, 
       desiredServings = 1 
     } = args || {};
     
@@ -82,7 +83,7 @@ export class RecipeToolHandlers extends BaseToolHandler {
     });
   };
 
-  public getRecipesFulfillment: ToolHandler = async (args: any): Promise<ToolResult> => {
+  public getRecipesFulfillment: ToolHandler = async (): Promise<ToolResult> => {
     return this.handleApiCall('/recipes/fulfillment', 'Get all recipes fulfillment');
   };
 
@@ -125,93 +126,151 @@ export class RecipeToolHandlers extends BaseToolHandler {
       shopping_list_id: shoppingListId
     };
     
-    return this.handleApiCall(`recipes/${recipeId}/add-not-fulfilled-products-to-shoppinglist`, 'Add missing products to shopping list', {
+    return this.handleApiCall(`/recipes/${recipeId}/add-not-fulfilled-products-to-shoppinglist`, 'Add missing products to shopping list', {
       method: 'POST',
       body
     });
   };
 
   public markRecipeFromMealPlanEntryAsCooked: ToolHandler = async (args: any): Promise<ToolResult> => {
-    const { recipeId, servings } = args || {};
+    const { mealPlanEntryId, stockAmounts } = args || {};
     
-    if (!recipeId) {
-      throw new McpError(ErrorCode.InvalidParams, 'recipeId is required. Use get_recipes tool to find recipe IDs.');
-    }
-    
-    if (!servings) {
-      throw new McpError(ErrorCode.InvalidParams, 'servings is required. Specify the number of servings to consume.');
+    if (!mealPlanEntryId) {
+      throw new McpError(ErrorCode.InvalidParams, 'mealPlanEntryId is required.');
     }
 
+    if (!stockAmounts || !Array.isArray(stockAmounts) || stockAmounts.length === 0) {
+      throw new McpError(ErrorCode.InvalidParams, 'stockAmounts is required and must be a non-empty array of serving amounts.');
+    }
+
+    // Validate all stock amounts are positive numbers
+    for (let i = 0; i < stockAmounts.length; i++) {
+      const amount = stockAmounts[i];
+      if (typeof amount !== 'number' || amount <= 0) {
+        throw new McpError(ErrorCode.InvalidParams, `stockAmounts[${i}] must be a positive number, got: ${amount}`);
+      }
+    }
+
+    const completedSteps: string[] = [];
+    
     try {
-      // First, find matching meal plan entry starting from yesterday that is not yet done
-      const yesterday = new Date();
-      yesterday.setDate(yesterday.getDate() - 1);
-      const yesterdayStr = yesterday.toISOString().split('T')[0];
-      let mealPlanEntry: any = null;
-      let mealPlanMarked = false;
-
-      // Get meal plan entries starting from yesterday
-      const mealPlanResponse = await apiClient.get('/objects/meal_plan', {
-        queryParams: { 'query[]': `day>=${yesterdayStr}`, limit: '100' }
-      });
-      
-      const mealPlanData = Array.isArray(mealPlanResponse.data) ? mealPlanResponse.data : [];
-      
-      // Find entry for this recipe that's not done yet (starting from yesterday)
-      mealPlanEntry = mealPlanData.find((entry: any) => 
-        entry.recipe_id == recipeId && entry.done == 0
-      );
+      // Get the specific meal plan entry
+      const mealPlanResponse = await apiClient.get(`/objects/meal_plan/${mealPlanEntryId}`);
+      const mealPlanEntry = mealPlanResponse.data;
 
       if (!mealPlanEntry) {
-        return this.createErrorResult(
-          `No undone meal plan entry found for recipe ${recipeId} starting from yesterday (${yesterdayStr}). Recipe must be planned in meal plan before marking as cooked.`,
-          { recipeId, searchFrom: yesterdayStr, availableEntries: mealPlanData.filter(e => e.recipe_id == recipeId) }
-        );
+        throw new Error(`Meal plan entry ${mealPlanEntryId} not found.`);
       }
 
-      // Mark the meal plan entry as done
-      await apiClient.put(`/objects/meal_plan/${mealPlanEntry.id}`, {
-        body: { ...mealPlanEntry, done: 1 }
-      });
-      mealPlanMarked = true;
-
-      // Consume the recipe ingredients
-      const consumeResult = await this.handleApiCall(`/recipes/${recipeId}/consume`, 'Consume recipe ingredients', {
-        method: 'POST',
-        body: { servings }
-      });
-
-      if (consumeResult.isError) {
-        return consumeResult;
+      if (mealPlanEntry.done == 1) {
+        throw new Error(`Meal plan entry ${mealPlanEntryId} is already marked as done. Cannot mark as cooked again.`);
       }
 
-      // Try to print label for the created stock entry (best effort)
-      let labelPrinted = false;
+      const recipeId = mealPlanEntry.recipe_id;
+
+      // Calculate total servings
+      const totalServings = stockAmounts.reduce((sum: number, amount: number) => sum + amount, 0);
+      
+      // Create recipe name with YYYY-MM-DD#<meal_plan.id> pattern  
+      const mealPlanDate = mealPlanEntry.day || new Date().toISOString().split('T')[0];
+      const mealplanShadow = `${mealPlanDate}#${mealPlanEntryId}`;
+      
+      // Mark the meal plan entry as done and update recipe_servings
+      await apiClient.put(`/objects/meal_plan/${mealPlanEntryId}`, {
+        done: 1,
+        recipe_servings: totalServings
+      });
+      completedSteps.push('Meal plan entry marked as done');
+
+      // Query for the mealplan shadow recipe by name
+      const shadowRecipeResponse = await apiClient.get('/objects/recipes', {
+        queryParams: { 'query[]': `name=${mealplanShadow}` }
+      });
+      
+      if (shadowRecipeResponse.data.length === 0) {
+        throw new Error(`Mealplan shadow recipe '${mealplanShadow}' not found. Cannot consume ingredients.`);
+      }
+      
+      const shadowRecipeId = shadowRecipeResponse.data[0].id;
+      
+      // Consume ingredients using the shadow recipe ID
+      await apiClient.post(`/recipes/${shadowRecipeId}/consume`);
+      completedSteps.push('Recipe ingredients consumed');
+
+      // Split stock entry and print labels for each portion
+      let stockEntries: { splitEntries: Array<{stockId: any, amount: number, type: string, unit: string}>, labelsPrinted: number } = { splitEntries: [], labelsPrinted: 0 };
       
       const recipeResponse = await apiClient.get(`/objects/recipes/${recipeId}`);
       const recipe = recipeResponse.data;
       
       if (recipe && recipe.product_id) {
-        const entriesResponse = await apiClient.get(`/stock/products/${recipe.product_id}/entries`);
-        const entries = Array.isArray(entriesResponse.data) ? entriesResponse.data : [];
+        // Get product details, quantity unit, and the most recent stock entry created by recipe consumption
+        const [productResponse, entriesResponse] = await Promise.all([
+          apiClient.get(`/objects/products/${recipe.product_id}`),
+          apiClient.get(`/stock/products/${recipe.product_id}/entries`, {
+            queryParams: { order: 'row_created_timestamp:desc', limit: '1' }
+          })
+        ]);
+        const product = productResponse.data;
         
-        if (entries.length > 0) {
-          const recentEntry = entries[0];
-          await apiClient.get(`/stock/entry/${recentEntry.stock_id}/printlabel`);
-          labelPrinted = true;
+        // Get quantity unit info
+        let quantityUnit = null;
+        if (product.qu_id_stock) {
+          try {
+            const quantityUnitResponse = await apiClient.get(`/objects/quantity_units/${product.qu_id_stock}`);
+            quantityUnit = quantityUnitResponse.data;
+          } catch (error) {
+            console.warn('Failed to fetch quantity unit:', error);
+          }
+        }
+        
+        // Helper function to get correct unit form
+        const getUnitForm = (amount: number): string => {
+          if (!quantityUnit) return '';
+          
+          // Handle edge cases
+          if (!quantityUnit.name) return '';
+          if (amount === 1) return quantityUnit.name;
+          
+          // Use plural form if available, otherwise fallback to singular
+          return quantityUnit.name_plural || quantityUnit.name;
+        };
+        
+        if (entriesResponse.data.length > 0) {
+          const originalEntry = entriesResponse.data[0];
+          
+          // Use the generic stock splitting helper method
+          stockEntries.splitEntries = await this.stockHandlers.splitStockEntry(
+            originalEntry, 
+            stockAmounts, 
+            getUnitForm
+          );
+          
+          // Print labels for all entries
+          for (const entry of stockEntries.splitEntries) {
+            try {
+              await apiClient.get(`/stock/entry/${entry.stockId}/printlabel`);
+              stockEntries.labelsPrinted++;
+            } catch (error) {
+              console.error(`Failed to print label for stock entry ${entry.stockId}:`, error);
+            }
+          }
         }
       }
 
       return this.createSuccessResult({
-        message: `Recipe ${recipeId} marked as cooked (${servings} servings consumed), meal plan entry marked as done${labelPrinted ? ' and label printed' : ''}`,
-        recipeId,
-        servings,
-        mealPlanEntry: mealPlanEntry ? { id: mealPlanEntry.id, day: mealPlanEntry.day, marked: mealPlanMarked } : null,
-        consumptionResult: consumeResult.content
+        message: `Meal plan entry ${mealPlanEntryId} marked as cooked (recipe ${recipeId}, ${totalServings} servings consumed, ${stockEntries.splitEntries.length} stock entries created, ${stockEntries.labelsPrinted} labels printed)`,
+        stockEntries,
       });
 
     } catch (error: any) {
-      return this.createErrorResult(`Failed to mark recipe as cooked: ${error.message}`, { recipeId, servings });
+      return this.createErrorResult(`Failed to mark meal plan entry as cooked.`, { 
+        completedSteps,
+        reason: error.message,
+        help: completedSteps.length > 0 
+          ? `Completed steps: ${completedSteps.join(', ')}. Check the error above and retry if needed.`
+          : 'No steps completed. Verify the meal plan entry ID exists and is not already marked as done.'
+      });
     }
   };
 }

@@ -5,13 +5,92 @@ import apiClient from '../../api/client.js';
 import Fuse from 'fuse.js';
 
 export class StockToolHandlers extends BaseToolHandler {
+  public async splitStockEntry(
+    originalEntry: any,
+    stockAmounts: number[],
+    getUnitForm: (amount: number) => string
+  ): Promise<{ stockId: any; amount: number; type: string; unit: string }[]> {
+    const splitEntries: { stockId: any; amount: number; type: string; unit: string }[] = [];
+
+    if (stockAmounts.length === 1) {
+      const note = `${originalEntry.note} - ${originalEntry.id} - 1`;
+      await apiClient.put(`/stock/entry/${originalEntry.id}`, {
+        amount: stockAmounts[0],
+        open: false,
+        note: note,
+        best_before_date: originalEntry.best_before_date,
+        purchased_date: originalEntry.purchased_date,
+        location_id: originalEntry.location_id
+      });
+      splitEntries.push({
+        stockId: originalEntry.id,
+        amount: stockAmounts[0],
+        type: 'updated',
+        unit: getUnitForm(stockAmounts[0])
+      });
+    } else {
+      for (let i = 0; i < stockAmounts.length; i++) {
+        const amount = stockAmounts[i];
+        const note = `${originalEntry.note} - ${originalEntry.id} - ${i + 1}`;
+
+        if (i === 0) {
+          await apiClient.put(`/stock/entry/${originalEntry.id}`, {
+            amount: amount,
+            open: false,
+            note: note,
+            best_before_date: originalEntry.best_before_date,
+            purchased_date: originalEntry.purchased_date,
+            location_id: originalEntry.location_id
+          });
+          splitEntries.push({
+            stockId: originalEntry.id,
+            amount,
+            type: 'updated',
+            unit: getUnitForm(amount)
+          });
+        } else {
+          const createResponse = await apiClient.post(`/stock/products/${originalEntry.product_id}/add`, {
+            amount,
+            best_before_date: originalEntry.best_before_date,
+            purchased_date: originalEntry.purchased_date,
+            transaction_type: 'purchase',
+            location_id: originalEntry.location_id,
+            note: note
+          });
+
+          const stockId = createResponse.data[0].stock_id || createResponse.data[0].id;
+          const stockResponse = await apiClient.get('/objects/stock');
+          const stockEntries = Array.isArray(stockResponse.data) ? stockResponse.data : [];
+
+          const actualStockEntry = stockEntries.find((entry: any) =>
+            entry.product_id === originalEntry.product_id &&
+            entry.stock_id === stockId
+          );
+
+          if (!actualStockEntry) {
+            throw new Error(`Could not find created stock entry with product_id ${originalEntry.product_id} and stock_id ${stockId}`);
+          }
+
+          splitEntries.push({
+            stockId: actualStockEntry.id,
+            amount,
+            type: 'created',
+            unit: getUnitForm(amount)
+          });
+        }
+      }
+    }
+
+    return splitEntries;
+  }
+
   public getAllStock: ToolHandler = async (args: any): Promise<ToolResult> => {
-    return this.handleApiCall('/stock', 'Get all stock');
+    return this.handleApiCall('/stock', 'Get current stock');
   };
 
   public getStockVolatile: ToolHandler = async (args: any): Promise<ToolResult> => {
     const queryParams = args?.includeDetails ? { include_details: 'true' } : {};
-    return this.handleApiCall('/api/stock/volatile', 'Get volatile stock information', { queryParams });
+    return this.handleApiCall('/stock/volatile', 'Get volatile stock information', { queryParams });
   };
 
   public getStockByLocation: ToolHandler = async (args: any): Promise<ToolResult> => {
@@ -20,59 +99,9 @@ export class StockToolHandlers extends BaseToolHandler {
       throw new McpError(ErrorCode.InvalidParams, 'locationId is required');
     }
     
-    // Get stock entries for the location
-    const entriesResponse = await apiClient.get(`/stock/locations/${locationId}/entries`);
-    const entries = Array.isArray(entriesResponse.data) ? entriesResponse.data : [];
-    
-    // Get unique product IDs from entries
-    const productIds = [...new Set(entries.map((entry: any) => entry.product_id).filter(id => id))];
-    
-    // Define the fields we want to keep for each product
-    const productFields = [
-      'id',
-      'name', 
-      'description',
-      'product_group_id',
-      'qu_id_stock',
-      'should_not_be_frozen',
-    ];
-    
-    // Fetch product details for all unique products
-    const productsMap: { [key: string]: any } = {};
-    await Promise.all(productIds.map(async (productId: any) => {
-      const productResponse = await apiClient.get(`/objects/products/${productId}`);
-      const fullProduct = productResponse.data;
-      // Filter to only the specified fields
-      productsMap[productId] = productFields.reduce((filtered: any, field: string) => {
-        filtered[field] = fullProduct[field];
-        return filtered;
-      }, {});
-    }));
-    
-    // Define the fields we want to keep for each stock entry
-    const entryFields = [
-      'id',
-      'amount',
-      'best_before_date',
-      'purchased_date',
-      'stock_id',
-      'note'
-    ];
-    
-    // Filter entries to only include essential fields and add product data
-    const enhancedEntries = entries.map((entry: any) => {
-      const filteredEntry = entryFields.reduce((filtered: any, field: string) => {
-        filtered[field] = entry[field];
-        return filtered;
-      }, {});
-      
-      return {
-        ...filteredEntry,
-        product: productsMap[entry.product_id]
-      };
+    return this.handleApiCall(`stock`, 'Get stock by location', {
+      queryParams: { location_id: locationId.toString() }
     });
-    
-    return this.createSuccessResult(enhancedEntries);
   };
 
   public inventoryProduct: ToolHandler = async (args: any): Promise<ToolResult> => {
@@ -82,7 +111,6 @@ export class StockToolHandlers extends BaseToolHandler {
       throw new McpError(ErrorCode.InvalidParams, 'productId and newAmount are required');
     }
 
-    // Default best before date is one year from now if not provided
     const defaultBBD = new Date();
     defaultBBD.setFullYear(defaultBBD.getFullYear() + 1);
     const formattedBBD = bestBeforeDate || defaultBBD.toISOString().split('T')[0];
@@ -103,21 +131,12 @@ export class StockToolHandlers extends BaseToolHandler {
   };
 
   public purchaseProduct: ToolHandler = async (args: any): Promise<ToolResult> => {
-    const { 
-      productId, 
-      amount = 1, 
-      bestBeforeDate, 
-      price, 
-      storeId, 
-      locationId, 
-      note 
-    } = args || {};
+    const { productId, amount = 1, bestBeforeDate, price, storeId, locationId, note } = args || {};
     
     if (!productId) {
       throw new McpError(ErrorCode.InvalidParams, 'productId is required');
     }
     
-    // Default best before date is one year from now if not provided
     const defaultBBD = new Date();
     defaultBBD.setFullYear(defaultBBD.getFullYear() + 1);
     const formattedBBD = bestBeforeDate || defaultBBD.toISOString().split('T')[0];
@@ -140,136 +159,132 @@ export class StockToolHandlers extends BaseToolHandler {
   };
 
   public consumeProduct: ToolHandler = async (args: any): Promise<ToolResult> => {
-    const { 
-      stockEntryId, 
-      amount, 
-      spoiled = false, 
-      note 
-    } = args || {};
-    
-    if (!stockEntryId) {
-      throw new McpError(ErrorCode.InvalidParams, 'stockEntryId is required. Use get_stock_by_product or get_stock_by_location to find specific stock entry IDs.');
+    const { stockId, productId, amount, spoiled = false, note } = args || {};
+
+    if (!stockId) {
+      throw new McpError(ErrorCode.InvalidParams, 'stockId is required. Use get_stock_by_product or get_stock_by_location to find specific stockId values.');
+    }
+
+    if (!productId) {
+      throw new McpError(ErrorCode.InvalidParams, 'productId is required.');
     }
 
     if (amount === undefined) {
       throw new McpError(ErrorCode.InvalidParams, 'amount is required');
     }
-    
+
     try {
-      // Get the product ID and location from the stock entry
-      const response = await apiClient.get(`/api/stock/entry/${stockEntryId}`);
-      if (!response.data || !response.data.product_id) {
-        throw new Error(`Could not resolve product ID from stock entry ${stockEntryId}`);
+      const stockEntryResponse = await apiClient.get(`/stock/entry/${stockId}`);
+      if (!stockEntryResponse.data || !stockEntryResponse.data.product_id) {
+        throw new Error(`Could not resolve product ID from stock entry ${stockId}`);
       }
-      
-      const targetProductId = response.data.product_id;
-      const locationId = response.data.location_id;
-      
+
+      if (stockEntryResponse.data.product_id !== productId) {
+        throw new Error(`Product ID mismatch: stock entry ${stockId} belongs to product ${stockEntryResponse.data.product_id}, but ${productId} was provided`);
+      }
+
       const body: Record<string, any> = {
         amount,
-        transaction_type: spoiled ? 'consume-spoiled' : 'consume',
         spoiled,
-        stock_entry_id: stockEntryId
+        stock_entry_id: stockEntryResponse.data.stock_id,
+        location_id: stockEntryResponse.data.location_id
       };
-      
-      if (locationId) body.location_id = locationId;
+
       if (note) body.note = note;
-      
-      return this.handleApiCall(`/stock/products/${targetProductId}/consume`, 'Consume product', {
+
+      return this.handleApiCall(`/stock/products/${stockEntryResponse.data.product_id}/consume`, 'Consume product', {
         method: 'POST',
         body
       });
     } catch (error: any) {
-      console.error('Error consuming product:', error);
-      return this.createErrorResult(`Failed to consume product: ${error.message}`, {
-        help: "Use get_stock_by_product or get_stock_by_location to find valid stock entry IDs.",
-        example: "Try using get_stock_by_product with a product ID to find valid stock entries"
-      });
+      return this.createErrorResult(`Failed to consume product: ${error.message}`);
     }
   };
 
   public transferProduct: ToolHandler = async (args: any): Promise<ToolResult> => {
-    const { stockEntryId, amount, locationIdTo, note } = args || {};
-    
-    if (!stockEntryId) {
-      throw new McpError(ErrorCode.InvalidParams, 'stockEntryId is required. Use get_stock_by_product or get_stock_by_location to find specific stock entry IDs.');
+    const { stockId, productId, amount, locationIdTo, note } = args || {};
+
+    if (!stockId) {
+      throw new McpError(ErrorCode.InvalidParams, 'stockId is required. Use get_stock_by_product or get_stock_by_location to find specific stockId values.');
+    }
+
+    if (!productId) {
+      throw new McpError(ErrorCode.InvalidParams, 'productId is required.');
     }
 
     if (amount === undefined) {
       throw new McpError(ErrorCode.InvalidParams, 'amount is required');
     }
 
-    if (!locationIdTo) {
-      throw new McpError(ErrorCode.InvalidParams, 'locationIdTo is required');
-    }
-    
     try {
-      // Get the product ID and current location from the stock entry
-      const response = await apiClient.get(`/api/stock/entry/${stockEntryId}`);
-      if (!response.data || !response.data.product_id) {
-        throw new Error(`Could not resolve product ID from stock entry ${stockEntryId}`);
+      const stockEntryResponse = await apiClient.get(`/stock/entry/${stockId}`);
+      if (!stockEntryResponse.data || !stockEntryResponse.data.product_id) {
+        throw new Error(`Could not resolve product ID from stock entry ${stockId}`);
       }
-      
-      const targetProductId = response.data.product_id;
-      const locationIdFrom = response.data.location_id;
-      
+
+      if (stockEntryResponse.data.product_id !== productId) {
+        throw new Error(`Product ID mismatch: stock entry ${stockId} belongs to product ${stockEntryResponse.data.product_id}, but ${productId} was provided`);
+      }
+
       const body: Record<string, any> = {
         amount,
-        location_id_from: locationIdFrom,
+        location_id_from: stockEntryResponse.data.location_id,
         location_id_to: locationIdTo,
         transaction_type: 'transfer',
-        stock_entry_id: stockEntryId
+        stock_entry_id: stockEntryResponse.data.stock_id
       };
-      
+
       if (note) body.note = note;
-      
-      return this.handleApiCall(`/stock/products/${targetProductId}/transfer`, 'Transfer product', {
+
+      return this.handleApiCall(`/stock/products/${stockEntryResponse.data.product_id}/transfer`, 'Transfer product', {
         method: 'POST',
         body
       });
     } catch (error: any) {
-      console.error('Error transferring product:', error);
-      return this.createErrorResult(`Failed to transfer product: ${error.message}`, {
-        help: "Use get_stock_by_product or get_stock_by_location to find valid stock entry IDs.",
-        example: "Try using get_stock_by_product with a product ID to find valid stock entries"
-      });
+      return this.createErrorResult(`Failed to transfer product: ${error.message}`);
     }
   };
 
   public openProduct: ToolHandler = async (args: any): Promise<ToolResult> => {
-    const { stockEntryId, amount, note } = args;
-    
-    if (!stockEntryId) {
-      throw new McpError(ErrorCode.InvalidParams, 'stockEntryId is required. Use get_stock_by_product tool to find specific stock entry IDs.');
+    const { stockId, productId, amount, note } = args;
+
+    if (!stockId) {
+      throw new McpError(ErrorCode.InvalidParams, 'stockId is required. Use get_stock_by_product tool to find specific stockId values.');
+    }
+
+    if (!productId) {
+      throw new McpError(ErrorCode.InvalidParams, 'productId is required.');
     }
 
     if (amount === undefined) {
       throw new McpError(ErrorCode.InvalidParams, 'amount is required');
     }
 
-    const body: any = { 
-      amount,
-      stock_entry_id: stockEntryId
-    };
-    if (note) body.note = note;
-    
     try {
-      // Get the product ID from the stock entry
-      const response = await apiClient.get(`/api/stock/entry/${stockEntryId}`);
-      if (!response.data || !response.data.product_id) {
-        throw new Error(`Could not resolve product ID from stock entry ${stockEntryId}`);
+      const stockEntryResponse = await apiClient.get(`/stock/entry/${stockId}`);
+      if (!stockEntryResponse.data || !stockEntryResponse.data.product_id) {
+        throw new Error(`Could not resolve product ID from stock entry ${stockId}`);
       }
-      
-      const targetProductId = response.data.product_id;
-      
-      return this.handleApiCall(`/api/stock/products/${targetProductId}/open`, 'Open product', {
+
+      if (stockEntryResponse.data.product_id !== productId) {
+        throw new Error(`Product ID mismatch: stock entry ${stockId} belongs to product ${stockEntryResponse.data.product_id}, but ${productId} was provided`);
+      }
+
+      const body: any = {
+        amount,
+        stock_entry_id: stockEntryResponse.data.stock_id,
+        location_id: stockEntryResponse.data.location_id
+      };
+      if (note) body.note = note;
+
+      return this.handleApiCall(`/stock/products/${stockEntryResponse.data.product_id}/open`, 'Open product', {
         method: 'POST',
         body
       });
     } catch (error: any) {
       console.error('Error opening product:', error);
       return this.createErrorResult(`Failed to open product: ${error.message}`, {
-        help: "Use get_stock_by_product tool to find valid stock entry IDs for a specific product.",
+        help: "Use get_stock_by_product tool to find valid stockId values for a specific product.",
         example: "Try using get_stock_by_product with a product ID to find valid stock entries"
       });
     }
@@ -283,7 +298,6 @@ export class StockToolHandlers extends BaseToolHandler {
     }
 
     try {
-      // Fetch all required data in parallel
       const [productsResponse, locationsResponse, quantityUnitsResponse] = await Promise.all([
         apiClient.get('/objects/products'),
         apiClient.get('/objects/locations'),
@@ -294,42 +308,37 @@ export class StockToolHandlers extends BaseToolHandler {
       const locations = Array.isArray(locationsResponse.data) ? locationsResponse.data : [];
       const quantityUnits = Array.isArray(quantityUnitsResponse.data) ? quantityUnitsResponse.data : [];
 
-      // Configure Fuse.js for advanced fuzzy matching
       const fuseOptions = {
         keys: [
           { name: 'name', weight: 1.0 },
           { name: 'description', weight: 0.3 }
         ],
-        threshold: 0.6, // Lower = more strict, higher = more permissive (0-1)
-        distance: 100,   // How far to search for matches
+        threshold: 0.6,
+        distance: 100,
         minMatchCharLength: 1,
-        ignoreLocation: true, // Don't care where in the string the match is
+        ignoreLocation: true,
         includeScore: true,
         includeMatches: true,
         useExtendedSearch: false,
-        // Advanced options for handling accents, case, etc.
         isCaseSensitive: false,
         shouldSort: true,
         findAllMatches: false
       };
 
-      // Create Fuse instance and search
       const fuse = new Fuse(products, fuseOptions);
       const fuseResults = fuse.search(productName);
 
-      // Convert Fuse results to our format and add more permissive fallback
       let productMatches = fuseResults.map((result: any) => ({
         ...result.item,
-        matchScore: Math.round((1 - result.score) * 100), // Convert Fuse score (lower=better) to percentage
+        matchScore: Math.round((1 - result.score) * 100),
         fuseScore: result.score,
         matches: result.matches
       }));
 
-      // If no results with strict threshold, try more permissive search
       if (productMatches.length === 0) {
         const permissiveFuse = new Fuse(products, {
           ...fuseOptions,
-          threshold: 0.8, // Much more permissive
+          threshold: 0.8,
           distance: 200
         });
         const permissiveResults = permissiveFuse.search(productName);
@@ -342,7 +351,6 @@ export class StockToolHandlers extends BaseToolHandler {
         }));
       }
 
-      // Take top 5 matches
       productMatches = productMatches.slice(0, 5);
 
       if (productMatches.length === 0) {
@@ -352,14 +360,12 @@ export class StockToolHandlers extends BaseToolHandler {
         });
       }
 
-      // Get stock information for matching products
       const enrichedMatches = await Promise.all(productMatches.map(async (product: any) => {
         let productEntries: any[] = [];
         try {
           const entriesResponse = await apiClient.get(`/stock/products/${product.id}/entries`);
           productEntries = Array.isArray(entriesResponse.data) ? entriesResponse.data : [];
-        } catch (error) {
-          // If we can't get entries, continue with empty array
+        } catch {
           productEntries = [];
         }
 
@@ -367,16 +373,15 @@ export class StockToolHandlers extends BaseToolHandler {
           return {
             amount: stockItem.amount,
             bestBeforeDate: stockItem.best_before_date,
-            stockId: stockItem.stock_id,
+            stockId: stockItem.id,
             locationId: parseInt(stockItem.location_id)
           };
         });
 
-        // Sort entries by best before date (earliest first)
         stockEntries.sort((a: any, b: any) => {
           if (!a.bestBeforeDate && !b.bestBeforeDate) return 0;
-          if (!a.bestBeforeDate) return 1; // No expiry goes last
-          if (!b.bestBeforeDate) return -1; // No expiry goes last
+          if (!a.bestBeforeDate) return 1;
+          if (!b.bestBeforeDate) return -1;
           return new Date(a.bestBeforeDate).getTime() - new Date(b.bestBeforeDate).getTime();
         });
 
@@ -415,13 +420,34 @@ export class StockToolHandlers extends BaseToolHandler {
   };
 
   public printStockEntryLabel: ToolHandler = async (args: any): Promise<ToolResult> => {
-    const { stockEntryId } = args || {};
-    
-    if (!stockEntryId) {
-      throw new McpError(ErrorCode.InvalidParams, 'stockEntryId is required. Use get_stock_by_product tool to find specific stock entry IDs.');
+    const { stockId, productId } = args || {};
+
+    if (!stockId) {
+      throw new McpError(ErrorCode.InvalidParams, 'stockId is required. Use get_stock_by_product tool to find specific stockId values.');
     }
-    
-    return this.handleApiCall(`/stock/entry/${stockEntryId}/printlabel`, 'Print stock entry label');
+
+    if (!productId) {
+      throw new McpError(ErrorCode.InvalidParams, 'productId is required.');
+    }
+
+    try {
+      const stockEntryResponse = await apiClient.get(`/stock/entry/${stockId}`);
+      if (!stockEntryResponse.data || !stockEntryResponse.data.product_id) {
+        throw new Error(`Could not resolve product ID from stock entry ${stockId}`);
+      }
+
+      if (stockEntryResponse.data.product_id !== productId) {
+        throw new Error(`Product ID mismatch: stock entry ${stockId} belongs to product ${stockEntryResponse.data.product_id}, but ${productId} was provided`);
+      }
+
+      return this.handleApiCall(`/stock/entry/${stockId}/printlabel`, 'Print stock entry label');
+    } catch (error: any) {
+      console.error('Error printing stock entry label:', error);
+      return this.createErrorResult(`Failed to print stock entry label: ${error.message}`, {
+        help: "Use get_stock_by_product tool to find valid stockId values for a specific product.",
+        example: "Try using get_stock_by_product with a product ID to find valid stock entries"
+      });
+    }
   };
 }
 

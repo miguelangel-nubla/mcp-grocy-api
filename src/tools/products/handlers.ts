@@ -1,6 +1,7 @@
 import { BaseToolHandler } from '../base.js';
 import { ToolResult, ToolHandler } from '../types.js';
 import { ErrorCode, McpError } from '@modelcontextprotocol/sdk/types.js';
+import apiClient from '../../api/client.js';
 
 export class ProductToolHandlers extends BaseToolHandler {
   public getProducts: ToolHandler = async (args: any): Promise<ToolResult> => {
@@ -9,26 +10,27 @@ export class ProductToolHandlers extends BaseToolHandler {
       throw new McpError(ErrorCode.InvalidParams, 'fields parameter is required and must be a non-empty array of field names');
     }
 
-    const result = await this.handleApiCall('/objects/products', 'Get all products');
-    
-    if (result.isError || !result.content) {
-      return result;
+    try {
+      const response = await apiClient.get('/objects/products');
+      const products = response.data || [];
+
+      // Filter the response to only include requested fields
+      const filteredData = Array.isArray(products) 
+        ? products.map((item: any) => {
+            const filtered: any = {};
+            fields.forEach(field => {
+              if (item.hasOwnProperty(field)) {
+                filtered[field] = item[field];
+              }
+            });
+            return filtered;
+          })
+        : products;
+
+      return this.createSuccessResult(filteredData);
+    } catch (error: any) {
+      return this.createErrorResult(`Failed to get products: ${error.message}`);
     }
-
-    // Filter the response to only include requested fields
-    const filteredData = Array.isArray(result.content) 
-      ? result.content.map((item: any) => {
-          const filtered: any = {};
-          fields.forEach(field => {
-            if (item.hasOwnProperty(field)) {
-              filtered[field] = item[field];
-            }
-          });
-          return filtered;
-        })
-      : result.content;
-
-    return this.createSuccessResult(filteredData);
   };
 
   public getStockByProduct: ToolHandler = async (args: any): Promise<ToolResult> => {
@@ -37,34 +39,38 @@ export class ProductToolHandlers extends BaseToolHandler {
       throw new McpError(ErrorCode.InvalidParams, 'productId is required');
     }
     
-    const result = await this.handleApiCall(`/stock/products/${productId}/entries`, 'Get stock by product');
-    
-    if (result.isError || !result.content) {
-      return result;
+    try {
+      const response = await apiClient.get(`/stock/products/${productId}/entries`);
+      const stockEntries = response.data || [];
+
+      // Define the fields we want to keep for each stock entry
+      const entryFields = [
+        'id',
+        'amount',
+        'best_before_date',
+        'purchased_date',
+        'stock_id',
+        'note',
+        'location_id'
+      ];
+      
+      // Filter entries to only include essential fields
+      const filteredEntries = Array.isArray(stockEntries) 
+        ? stockEntries.map((entry: any) => {
+            const filteredEntry = entryFields.reduce((filtered: any, field: string) => {
+              if (entry.hasOwnProperty(field)) {
+                filtered[field] = entry[field];
+              }
+              return filtered;
+            }, {});
+            return filteredEntry;
+          })
+        : [];
+
+      return this.createSuccessResult(filteredEntries);
+    } catch (error: any) {
+      return this.createErrorResult(`Failed to get stock by product: ${error.message}`);
     }
-
-    // Define the fields we want to keep for each stock entry
-    const entryFields = [
-      'id',
-      'amount',
-      'best_before_date',
-      'purchased_date',
-      'stock_id',
-      'note'
-    ];
-    
-    // Filter entries to only include essential fields
-    const filteredEntries = Array.isArray(result.content) 
-      ? result.content.map((entry: any) => {
-          const filteredEntry = entryFields.reduce((filtered: any, field: string) => {
-            filtered[field] = entry[field];
-            return filtered;
-          }, {});
-          return filteredEntry;
-        })
-      : result.content;
-
-    return this.createSuccessResult(filteredEntries);
   };
 
   public getPriceHistory: ToolHandler = async (args: any): Promise<ToolResult> => {

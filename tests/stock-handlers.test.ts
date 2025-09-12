@@ -40,7 +40,7 @@ describe('StockToolHandlers', () => {
       };
       mockApiClient.request.mockResolvedValue(mockResponse);
 
-      const result = await handlers.getStock({});
+      const result = await handlers.getAllStock({});
 
       expect(mockApiClient.request).toHaveBeenCalledWith('/stock', {
         method: 'GET',
@@ -61,7 +61,7 @@ describe('StockToolHandlers', () => {
 
       await handlers.getStockVolatile({});
 
-      expect(mockApiClient.request).toHaveBeenCalledWith('/api/stock/volatile', {
+      expect(mockApiClient.request).toHaveBeenCalledWith('/stock/volatile', {
         method: 'GET',
         body: null,
         headers: {},
@@ -75,7 +75,7 @@ describe('StockToolHandlers', () => {
 
       await handlers.getStockVolatile({ includeDetails: true });
 
-      expect(mockApiClient.request).toHaveBeenCalledWith('/api/stock/volatile', {
+      expect(mockApiClient.request).toHaveBeenCalledWith('/stock/volatile', {
         method: 'GET',
         body: null,
         headers: {},
@@ -194,22 +194,30 @@ describe('StockToolHandlers', () => {
   });
 
   describe('consumeProduct', () => {
-    it('should require productId', async () => {
+    it('should require stockId', async () => {
       await expect(handlers.consumeProduct({})).rejects.toThrow(McpError);
+      await expect(handlers.consumeProduct({})).rejects.toThrow('stockId is required');
     });
 
     it('should make consume request with defaults', async () => {
+      // Mock the stock entry lookup
+      mockApiClient.get.mockResolvedValueOnce({
+        data: { product_id: 1 },
+        status: 200,
+        headers: {}
+      });
+      
       const mockResponse = { data: { success: true }, status: 200, headers: {} };
       mockApiClient.request.mockResolvedValue(mockResponse);
 
-      await handlers.consumeProduct({ productId: 1 });
+      await handlers.consumeProduct({ stockId: 123, amount: 1 });
 
       expect(mockApiClient.request).toHaveBeenCalledWith('/stock/products/1/consume', {
         method: 'POST',
         body: expect.objectContaining({
           amount: 1,
-          transaction_type: 'consume',
-          spoiled: false
+          spoiled: false,
+          stock_entry_id: 123
         }),
         headers: {},
         queryParams: {}
@@ -217,11 +225,18 @@ describe('StockToolHandlers', () => {
     });
 
     it('should handle spoiled products', async () => {
+      // Mock the stock entry lookup
+      mockApiClient.get.mockResolvedValueOnce({
+        data: { product_id: 1 },
+        status: 200,
+        headers: {}
+      });
+      
       const mockResponse = { data: { success: true }, status: 200, headers: {} };
       mockApiClient.request.mockResolvedValue(mockResponse);
 
       await handlers.consumeProduct({ 
-        productId: 1, 
+        stockId: 123, 
         spoiled: true, 
         amount: 2 
       });
@@ -230,8 +245,8 @@ describe('StockToolHandlers', () => {
         method: 'POST',
         body: expect.objectContaining({
           amount: 2,
-          transaction_type: 'consume-spoiled',
-          spoiled: true
+          spoiled: true,
+          stock_entry_id: 123
         }),
         headers: {},
         queryParams: {}
@@ -250,12 +265,18 @@ describe('StockToolHandlers', () => {
     });
 
     it('should make transfer request', async () => {
+      // Mock the stock entry lookup
+      mockApiClient.get.mockResolvedValueOnce({
+        data: { product_id: 1, location_id: 2 },
+        status: 200,
+        headers: {}
+      });
+      
       const mockResponse = { data: { success: true }, status: 200, headers: {} };
       mockApiClient.request.mockResolvedValue(mockResponse);
 
       const args = {
-        productId: 1,
-        locationIdFrom: 2,
+        stockId: 123,
         locationIdTo: 3,
         amount: 5,
         note: 'Moving to pantry'
@@ -270,7 +291,8 @@ describe('StockToolHandlers', () => {
           location_id_from: 2,
           location_id_to: 3,
           note: 'Moving to pantry',
-          transaction_type: 'transfer'
+          transaction_type: 'transfer',
+          stock_entry_id: 123
         }),
         headers: {},
         queryParams: {}
@@ -279,28 +301,13 @@ describe('StockToolHandlers', () => {
   });
 
   describe('openProduct', () => {
-    it('should require either productId or stockEntryId', async () => {
+    it('should require stockId', async () => {
       await expect(handlers.openProduct({})).rejects.toThrow(McpError);
-      await expect(handlers.openProduct({})).rejects.toThrow('Either productId or stockEntryId must be provided');
+      await expect(handlers.openProduct({})).rejects.toThrow('stockId is required');
     });
 
-    it('should handle productId directly', async () => {
-      const mockResponse = { data: { success: true }, status: 200, headers: {} };
-      mockApiClient.request.mockResolvedValue(mockResponse);
 
-      await handlers.openProduct({ productId: 1, amount: 2 });
-
-      expect(mockApiClient.request).toHaveBeenCalledWith('/api/stock/products/1/open', {
-        method: 'POST',
-        body: expect.objectContaining({
-          amount: 2
-        }),
-        headers: {},
-        queryParams: {}
-      });
-    });
-
-    it('should resolve productId from stockEntryId', async () => {
+    it('should resolve productId from stockId', async () => {
       // Mock the stock entry lookup
       mockApiClient.get.mockResolvedValueOnce({
         data: { product_id: 5 },
@@ -312,10 +319,10 @@ describe('StockToolHandlers', () => {
       const mockResponse = { data: { success: true }, status: 200, headers: {} };
       mockApiClient.request.mockResolvedValue(mockResponse);
 
-      await handlers.openProduct({ stockEntryId: 123, amount: 1 });
+      await handlers.openProduct({ stockId: 123, amount: 1 });
 
-      expect(mockApiClient.get).toHaveBeenCalledWith('/api/stock/entry/123');
-      expect(mockApiClient.request).toHaveBeenCalledWith('/api/stock/products/5/open', {
+      expect(mockApiClient.get).toHaveBeenCalledWith('/stock/entry/123');
+      expect(mockApiClient.request).toHaveBeenCalledWith('/stock/products/5/open', {
         method: 'POST',
         body: expect.objectContaining({
           amount: 1,
@@ -326,14 +333,14 @@ describe('StockToolHandlers', () => {
       });
     });
 
-    it('should handle stockEntryId lookup failure', async () => {
+    it('should handle stockId lookup failure', async () => {
       mockApiClient.get.mockRejectedValue(new Error('Entry not found'));
 
-      const result = await handlers.openProduct({ stockEntryId: 999 });
+      const result = await handlers.openProduct({ stockId: 999, amount: 1 });
 
       expect(result.isError).toBe(true);
       expect(result.content[0].text).toContain('Failed to open product');
-      expect(result.content[0].text).toContain('Failed to get product ID from stock entry');
+      expect(result.content[0].text).toContain('Entry not found');
     });
   });
 });

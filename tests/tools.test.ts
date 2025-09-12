@@ -12,7 +12,7 @@ describe('ToolRegistry', () => {
     // Check for some key tools
     const toolNames = definitions.map(def => def.name);
     expect(toolNames).toContain('get_products');
-    expect(toolNames).toContain('get_stock');
+    expect(toolNames).toContain('get_all_stock');
     expect(toolNames).toContain('get_recipes');
     expect(toolNames).toContain('purchase_product');
     expect(toolNames).toContain('consume_product');

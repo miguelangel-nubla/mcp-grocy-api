@@ -112,9 +112,15 @@ export const stockToolDefinitions: ToolDefinition[] = [
     inputSchema: {
       type: 'object',
       properties: {
-        stockEntryId: {
+        stockId: {
           type: 'number',
           description: 'ID of the specific stock entry to consume.'
+        },
+        productId: {
+          type: 'number',
+          // ProductId is required for verification - if user knows the stockId, they must know the productId.
+          // This ensures the call is made to the correct stock entry and prevents accidental operations.
+          description: 'ID of the product being consumed.'
         },
         amount: {
           type: 'number',
@@ -130,7 +136,7 @@ export const stockToolDefinitions: ToolDefinition[] = [
           description: 'Optional note'
         }
       },
-      required: ['stockEntryId', 'amount']
+      required: ['stockId', 'productId', 'amount']
     }
   },
   {
@@ -139,9 +145,15 @@ export const stockToolDefinitions: ToolDefinition[] = [
     inputSchema: {
       type: 'object',
       properties: {
-        stockEntryId: {
+        stockId: {
           type: 'number',
           description: 'ID of the specific stock entry to transfer.'
+        },
+        productId: {
+          type: 'number',
+          // ProductId is required for verification - if user knows the stockId, they must know the productId.
+          // This ensures the call is made to the correct stock entry and prevents accidental operations.
+          description: 'ID of the product being transferred.'
         },
         amount: {
           type: 'number',
@@ -156,7 +168,7 @@ export const stockToolDefinitions: ToolDefinition[] = [
           description: 'Optional note for this transfer'
         }
       },
-      required: ['stockEntryId', 'amount', 'locationIdTo']
+      required: ['stockId', 'productId', 'amount', 'locationIdTo']
     }
   },
   {
@@ -165,9 +177,15 @@ export const stockToolDefinitions: ToolDefinition[] = [
     inputSchema: {
       type: 'object',
       properties: {
-        stockEntryId: {
+        stockId: {
           type: 'number',
           description: 'ID of the specific stock entry to mark as opened.'
+        },
+        productId: {
+          type: 'number',
+          // ProductId is required for verification - if user knows the stockId, they must know the productId.
+          // This ensures the call is made to the correct stock entry and prevents accidental operations.
+          description: 'ID of the product being opened.'
         },
         amount: {
           type: 'number',
@@ -178,7 +196,7 @@ export const stockToolDefinitions: ToolDefinition[] = [
           description: 'Optional note'
         }
       },
-      required: ['stockEntryId', 'amount']
+      required: ['stockId', 'productId', 'amount']
     }
   },
   {
@@ -201,12 +219,18 @@ export const stockToolDefinitions: ToolDefinition[] = [
     inputSchema: {
       type: 'object',
       properties: {
-        stockEntryId: {
+        stockId: {
           type: 'number',
           description: 'ID of the stock entry to print label for.'
+        },
+        productId: {
+          type: 'number',
+          // ProductId is required for verification - if user knows the stockId, they must know the productId.
+          // This ensures the call is made to the correct stock entry and prevents accidental operations.
+          description: 'ID of the product for the label.'
         }
       },
-      required: ['stockEntryId']
+      required: ['stockId', 'productId']
     }
   }
 ];
