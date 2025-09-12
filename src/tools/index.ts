@@ -15,13 +15,17 @@ import apiClient from '../api/client.js';
 const mealPlanToolDefinitions = [
   {
     name: 'get_meal_plan',
-    description: 'Get your meal plan data from Grocy instance with corresponding recipe details. Returns planned meals for a specific date including recipe names, descriptions, meal sections, and other details. Use this to find out what recipes/meals are planned for a specific date (e.g., "what\'s for dinner tomorrow", "recipes for today", "meal plan for next week"). The returned data includes the id field (meal plan entry ID) which can be used with delete_recipe_from_meal_plan.',
+    description: 'Get your meal plan data from Grocy instance with corresponding recipe details. Returns planned meals for the requested date plus surrounding days for context. Use this to find out what recipes/meals are planned for a specific date (e.g., "what\'s for dinner tomorrow", "recipes for today", "meal plan for next week"). The returned data includes the id field (meal plan entry ID) which can be used with delete_recipe_from_meal_plan.',
     inputSchema: {
       type: 'object' as const,
       properties: {
         date: {
           type: 'string',
-          description: 'Date in YYYY-MM-DD format (e.g., "2024-12-25"). Use today\'s date or future dates to see planned meals. Consider that asking for today past 00:00 AM might mean yesterday. Do both days if not sure.'
+          description: 'Date in YYYY-MM-DD format (e.g., "2024-12-25"). The tool will return meal plans for this date plus the previous and next day for better context.'
+        },
+        weekly: {
+          type: 'boolean',
+          description: 'If true, returns the entire calendar week containing the specified date.'
         }
       },
       required: ['date']
@@ -84,30 +88,103 @@ const mealPlanToolDefinitions = [
 
 class MealPlanToolHandlers extends BaseToolHandler {
   public getMealPlan: THandler = async (args: any): Promise<ToolResult> => {
-    const date = args?.date || new Date().toISOString().split('T')[0];
+    const requestedDate = args?.date || new Date().toISOString().split('T')[0];
+    const weekly = args?.weekly || false;
+    
+    let datesToFetch: string[] = [];
+    let startDate: Date, endDate: Date;
+    
+    if (weekly) {
+      // Calculate the calendar week (Monday to Sunday) for the requested date
+      const date = new Date(requestedDate);
+      const dayOfWeek = date.getDay(); // 0 = Sunday, 1 = Monday, etc.
+      
+      // Find Monday of the week (start of calendar week)
+      const monday = new Date(date);
+      const daysFromMonday = dayOfWeek === 0 ? 6 : dayOfWeek - 1; // Handle Sunday case
+      monday.setDate(date.getDate() - daysFromMonday);
+      
+      // Add one day before Monday and one day after Sunday
+      startDate = new Date(monday);
+      startDate.setDate(monday.getDate() - 1); // Day before Monday
+      
+      endDate = new Date(monday);
+      endDate.setDate(monday.getDate() + 8); // Day after Sunday (Monday + 7 days + 1)
+      
+      // Generate all dates from startDate to endDate
+      const currentDate = new Date(startDate);
+      while (currentDate <= endDate) {
+        datesToFetch.push(currentDate.toISOString().split('T')[0]);
+        currentDate.setDate(currentDate.getDate() + 1);
+      }
+    } else {
+      // Original behavior: previous + requested + next day
+      const date = new Date(requestedDate);
+      const previousDay = new Date(date);
+      previousDay.setDate(date.getDate() - 1);
+      const nextDay = new Date(date);
+      nextDay.setDate(date.getDate() + 1);
+      
+      startDate = previousDay;
+      endDate = nextDay;
+      
+      datesToFetch = [
+        previousDay.toISOString().split('T')[0],
+        requestedDate,
+        nextDay.toISOString().split('T')[0]
+      ];
+    }
     
     try {
-      // First get the meal plan entries for the date
-      const mealPlanResponse = await apiClient.get('/objects/meal_plan', {
-        queryParams: { 'query[]': `day=${date}`, limit: '100' }
+      // Get meal plan entries for all requested days
+      const mealPlanResponses = await Promise.allSettled(
+        datesToFetch.map(dateStr => 
+          apiClient.get('/objects/meal_plan', {
+            queryParams: { 'query[]': `day=${dateStr}`, limit: '100' }
+          })
+        )
+      );
+      
+      // Combine all meal plan data
+      const allMealPlanData: any[] = [];
+      const dayResults: Record<string, any[]> = {};
+      
+      datesToFetch.forEach((dateStr, index) => {
+        const response = mealPlanResponses[index];
+        const entries = response.status === 'fulfilled' ? (response.value.data || []) : [];
+        dayResults[dateStr] = entries;
+        
+        if (Array.isArray(entries)) {
+          allMealPlanData.push(...entries);
+        }
       });
       
-      const mealPlanData = mealPlanResponse.data;
-      
-      if (!mealPlanData || !Array.isArray(mealPlanData)) {
-        return this.createSuccessResult({ message: 'No meal plan entries found for this date', date });
-      }
-
-      if (mealPlanData.length === 0) {
+      if (allMealPlanData.length === 0) {
+        const dateRange = weekly 
+          ? {
+              start_date: startDate.toISOString().split('T')[0],
+              end_date: endDate.toISOString().split('T')[0],
+              week_dates: datesToFetch
+            }
+          : {
+              previous_day: datesToFetch[0],
+              requested_day: requestedDate,
+              next_day: datesToFetch[2]
+            };
+            
         return this.createSuccessResult({ 
-          message: 'No meals planned for this date',
-          date: date,
-          meal_plan_entries: []
+          message: weekly 
+            ? 'No meals planned for the requested week or surrounding days'
+            : 'No meals planned for the requested date or surrounding days',
+          requested_date: requestedDate,
+          weekly,
+          date_range: dateRange,
+          meal_plan_by_date: dayResults
         });
       }
 
-      // Extract unique recipe IDs from meal plan entries
-      const recipeIds = [...new Set(mealPlanData.map((entry: any) => entry.recipe_id).filter(id => id))];
+      // Extract unique recipe IDs from all meal plan entries
+      const recipeIds = [...new Set(allMealPlanData.map((entry: any) => entry.recipe_id).filter(id => id))];
 
       // Fetch recipe details and sections in parallel
       const [recipeResponses, sectionsResponse] = await Promise.allSettled([
@@ -137,16 +214,38 @@ class MealPlanToolHandlers extends BaseToolHandler {
         return acc;
       }, {});
 
-      // Enhance meal plan entries with recipe and section details
-      const enhancedMealPlan = mealPlanData.map((entry: any) => ({
-        ...entry,
-        recipe_details: recipesMap[entry.recipe_id] || { name: `Recipe ${entry.recipe_id} (not found)` },
-        section_details: sectionsMap[entry.section_id] || { name: `Section ${entry.section_id}` }
-      }));
+      // Enhance meal plan entries with recipe and section details for each day
+      const enhancedMealPlanByDate: Record<string, any[]> = {};
+      
+      Object.entries(dayResults).forEach(([date, entries]) => {
+        if (Array.isArray(entries)) {
+          enhancedMealPlanByDate[date] = entries.map((entry: any) => ({
+            ...entry,
+            recipe_details: recipesMap[entry.recipe_id] || { name: `Recipe ${entry.recipe_id} (not found)` },
+            section_details: sectionsMap[entry.section_id] || { name: `Section ${entry.section_id}` }
+          }));
+        } else {
+          enhancedMealPlanByDate[date] = [];
+        }
+      });
+
+      const dateRange = weekly 
+        ? {
+            start_date: startDate.toISOString().split('T')[0],
+            end_date: endDate.toISOString().split('T')[0],
+            week_dates: datesToFetch
+          }
+        : {
+            previous_day: datesToFetch[0],
+            requested_day: requestedDate,
+            next_day: datesToFetch[2]
+          };
 
       return this.createSuccessResult({
-        date: date,
-        meal_plan_entries: enhancedMealPlan,
+        requested_date: requestedDate,
+        weekly,
+        date_range: dateRange,
+        meal_plan_by_date: enhancedMealPlanByDate,
         all_available_meal_sections: sections.map((section: any) => ({
           id: section.id,
           name: section.name,
@@ -154,7 +253,7 @@ class MealPlanToolHandlers extends BaseToolHandler {
         }))
       });
     } catch (error: any) {
-      return this.createErrorResult(`Failed to get meal plan: ${error.message}`, { date });
+      return this.createErrorResult(`Failed to get meal plan: ${error.message}`, { requested_date: requestedDate, weekly });
     }
   };
 
