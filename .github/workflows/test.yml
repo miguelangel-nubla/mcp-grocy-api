@@ -77,6 +77,29 @@ jobs:
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
+  check-npm-token:
+    name: Check NPM TOKEN
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          ref: main  # Ensure we're using the code from main branch after release
+          fetch-depth: 0  # Fetch all history for proper versioning
+          fetch-tags: true # Fetch all tags to ensure release tag is available
+
+      - name: Verify NPM_TOKEN secret
+        env:
+          CHECK_TOKEN: ${{ secrets.NPM_TOKEN != '' }}
+        run: |
+          if [[ "$CHECK_TOKEN" != "true" ]]; then
+            echo "::error::NPM_TOKEN secret is not set. Cannot publish to NPM."
+            exit 1
+          else
+            echo "NPM_TOKEN secret is available"
+          fi
+
   check-base-image:
     name: Check Base Image for Hassio Addons
     runs-on: ubuntu-latest
